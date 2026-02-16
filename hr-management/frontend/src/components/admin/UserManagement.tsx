@@ -33,7 +33,8 @@ import {
     Clock,
     Loader2,
     Edit,
-    Trash
+    Trash,
+    FileDown
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
@@ -54,6 +55,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
+import { API_BASE_URL } from "@/lib/config"
 
 interface User {
     id: string
@@ -63,6 +65,8 @@ interface User {
     role: { name: string } | null
     department?: string
     designation?: string
+    phone?: string
+    discordId?: string
     status: string
     createdAt: string
 }
@@ -88,7 +92,9 @@ export default function UserManagement({ token }: { token: string }) {
         password: "Password123!", // Default password for new members
         roleId: "",
         department: "",
-        designation: ""
+        designation: "",
+        phone: "",
+        discordId: ""
     })
 
     // Edit User State
@@ -100,7 +106,9 @@ export default function UserManagement({ token }: { token: string }) {
         department: "",
         designation: "",
         roleId: "",
-        status: ""
+        status: "",
+        phone: "",
+        discordId: ""
     })
 
     const router = useRouter()
@@ -113,15 +121,32 @@ export default function UserManagement({ token }: { token: string }) {
             department: user.department || "",
             designation: user.designation || "",
             roleId: user.roleId,
-            status: user.status
+            status: user.status,
+            phone: user.phone || "",
+            discordId: user.discordId || ""
         })
         setEditOpen(true)
     }
 
     const handleUpdateUser = async () => {
         if (!selectedUser) return
+
+        // Validation
+        if (!/^[a-zA-Z\s]+$/.test(editForm.name)) {
+            toast({ title: "Validation Error", description: "Name must contain only letters.", variant: "destructive" })
+            return
+        }
+        if (editForm.phone && !/^\d{10,15}$/.test(editForm.phone)) {
+            toast({ title: "Validation Error", description: "Phone must be 10-15 digits.", variant: "destructive" })
+            return
+        }
+        if (editForm.discordId && !/^\d{17,19}$/.test(editForm.discordId)) {
+            toast({ title: "Validation Error", description: "Discord ID must be 17-19 digits.", variant: "destructive" })
+            return
+        }
+
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}`, {
+            const res = await fetch(`${API_BASE_URL}/users/${selectedUser.id}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -145,7 +170,7 @@ export default function UserManagement({ token }: { token: string }) {
 
     const handleDeactivate = async (userId: string) => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`, {
+            const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -173,10 +198,10 @@ export default function UserManagement({ token }: { token: string }) {
         setLoading(true)
         try {
             const [usersRes, rolesRes] = await Promise.all([
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+                fetch(`${API_BASE_URL}/users`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/roles`, {
+                fetch(`${API_BASE_URL}/admin/roles`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
             ])
@@ -199,23 +224,50 @@ export default function UserManagement({ token }: { token: string }) {
     }
 
     const handleAddUser = async () => {
+        if (!newUser.roleId) {
+            toast({ title: "Validation Error", description: "Please assign a role to the new user.", variant: "destructive" })
+            return
+        }
+        if (!/^[a-zA-Z\s]+$/.test(newUser.name)) {
+            toast({ title: "Validation Error", description: "Name must contain only letters.", variant: "destructive" })
+            return
+        }
+        if (!/^\S+@\S+\.\S+$/.test(newUser.email)) {
+            toast({ title: "Validation Error", description: "Invalid email format.", variant: "destructive" })
+            return
+        }
+        if (newUser.phone && !/^\d{10,15}$/.test(newUser.phone)) {
+            toast({ title: "Validation Error", description: "Phone must be 10-15 digits.", variant: "destructive" })
+            return
+        }
+        if (newUser.discordId && !/^\d{17,19}$/.test(newUser.discordId)) {
+            toast({ title: "Validation Error", description: "Discord ID must be 17-19 digits.", variant: "destructive" })
+            return
+        }
+
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+            // Ensure phone has +91 prefix if not present
+            const finalNewUser = {
+                ...newUser,
+                phone: newUser.phone ? (newUser.phone.startsWith('+') ? newUser.phone : `+91${newUser.phone}`) : ""
+            }
+
+            const res = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify(newUser)
+                body: JSON.stringify(finalNewUser)
             })
 
             if (res.ok) {
                 toast({ title: "User Created", description: "The new user has been successfully onboarded." })
                 setOpen(false)
                 fetchInitialData()
-                setNewUser({ name: "", email: "", password: "Password123!", roleId: "", department: "", designation: "" })
+                setNewUser({ name: "", email: "", password: "Password123!", roleId: "", department: "", designation: "", phone: "", discordId: "" })
             } else {
-                const error = await res.json()
+                const error = await res.json().catch(() => ({ message: "Server error" }))
                 toast({ title: "Error", description: error.message || "Failed to create user", variant: "destructive" })
             }
         } catch (err) {
@@ -237,6 +289,32 @@ export default function UserManagement({ token }: { token: string }) {
             case 'SUSPENDED': return 'bg-rose-100 text-rose-700 border-rose-200'
             default: return 'bg-slate-100 text-slate-700 border-slate-200'
         }
+    }
+
+    const handleExport = () => {
+        const headers = ["Name", "Email", "Role", "Department", "Designation", "Phone", "Status", "Joined"]
+        const csvContent = [
+            headers.join(","),
+            ...filteredUsers.map(u => [
+                `"${u.name}"`,
+                `"${u.email}"`,
+                `"${u.role?.name || ''}"`,
+                `"${u.department || ''}"`,
+                `"${u.designation || ''}"`,
+                `"${u.phone || ''}"`,
+                u.status,
+                u.createdAt
+            ].join(","))
+        ].join("\n")
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.setAttribute("href", url)
+        link.setAttribute("download", "user_export.csv")
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
     }
 
     if (loading) {
@@ -274,6 +352,10 @@ export default function UserManagement({ token }: { token: string }) {
                         </SelectContent>
                     </Select>
 
+                    <Button variant="outline" className="gap-2" onClick={handleExport}>
+                        <FileDown className="w-4 h-4" /> Export CSV
+                    </Button>
+
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogTrigger asChild>
                             <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 px-6">
@@ -310,6 +392,18 @@ export default function UserManagement({ token }: { token: string }) {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Phone</label>
+                                        <div className="flex items-center">
+                                            <span className="bg-slate-100 border border-r-0 border-slate-200 text-slate-500 px-3 py-2 rounded-l-md text-sm">+91</span>
+                                            <Input
+                                                className="rounded-l-none"
+                                                placeholder="9876543210"
+                                                value={newUser.phone}
+                                                onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500 uppercase">Department</label>
                                         <Input
                                             placeholder="Engineering"
@@ -333,6 +427,14 @@ export default function UserManagement({ token }: { token: string }) {
                                         placeholder="Software Engineer"
                                         value={newUser.designation}
                                         onChange={(e) => setNewUser({ ...newUser, designation: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Discord ID</label>
+                                    <Input
+                                        placeholder="123456789012345678"
+                                        value={newUser.discordId}
+                                        onChange={(e) => setNewUser({ ...newUser, discordId: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -495,17 +597,37 @@ export default function UserManagement({ token }: { token: string }) {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Phone</label>
+                                <div className="flex items-center">
+                                    <span className="bg-slate-100 border border-r-0 border-slate-200 text-slate-500 px-3 py-2 rounded-l-md text-sm">+91</span>
+                                    <Input
+                                        className="rounded-l-none"
+                                        value={editForm.phone}
+                                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Department</label>
                                 <Input
                                     value={editForm.department}
                                     onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
                                 />
                             </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Designation</label>
                                 <Input
                                     value={editForm.designation}
                                     onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Discord ID</label>
+                                <Input
+                                    value={editForm.discordId}
+                                    onChange={(e) => setEditForm({ ...editForm, discordId: e.target.value })}
                                 />
                             </div>
                         </div>

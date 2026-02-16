@@ -1,0 +1,254 @@
+Perfect Ashok 👍
+Now I will **modify your payroll architecture** exactly as you requested:
+
+✅ Employee → Can see only their individual payslip
+✅ Manager → Can see payroll flow & team summary (NO edit access)
+✅ Admin → Can generate, approve, lock & release
+
+This is a proper enterprise RBAC (Role-Based Access Control) model.
+
+---
+
+# 🏛 MODIFIED PAYROLL ARCHITECTURE (ROLE-BASED CONTROL)
+
+---
+
+# 1️⃣ ROLE ACCESS MODEL
+
+| Role     | View Own Payslip | View Team     | Generate | Approve | Lock | Release | Edit Salary     |
+| -------- | ---------------- | ------------- | -------- | ------- | ---- | ------- | --------------- |
+| Employee | ✅                | ❌             | ❌        | ❌       | ❌    | ❌       | ❌               |
+| Manager  | ❌                | ✅ (View Only) | ❌        | ❌       | ❌    | ❌       | ❌               |
+| Admin    | ✅                | ✅             | ✅        | ✅       | ✅    | ✅       | ✅ (Before Lock) |
+
+---
+
+# 2️⃣ FUNCTIONAL WORKING (UPDATED FLOW)
+
+---
+
+# 🔹 EMPLOYEE FUNCTIONALITIES
+
+## What Employee Can Do
+
+### 1️⃣ Login
+
+* Logs in using RBAC
+* Role = EMPLOYEE
+
+### 2️⃣ View Payslip Page
+
+Route:
+
+```
+/employee/payslips
+```
+
+Backend filters:
+
+```
+WHERE employee_id = loggedInUser.id
+```
+
+Employee sees:
+
+* Month
+* Gross Salary
+* Net Salary
+* Status
+* Download PDF
+
+❌ Cannot:
+
+* View others
+* Edit anything
+* Regenerate
+
+Security Rule:
+
+```
+if (user.role !== "EMPLOYEE") reject
+if (payslip.employee_id !== user.id) reject
+```
+
+---
+
+# 🔹 MANAGER FUNCTIONALITIES (View-Only Control)
+
+Managers can:
+
+### 1️⃣ View Payroll Flow Dashboard
+
+Route:
+
+```
+/manager/payroll-overview
+```
+
+They can see:
+
+* Payroll batch status
+* Team salary summary
+* Total payroll expense
+* Approval stage
+
+But:
+
+❌ No Generate button
+❌ No Approve button
+❌ No Edit option
+
+Backend restriction:
+
+```
+if (user.role === "MANAGER") {
+   allow GET requests only
+   block POST / PUT / DELETE
+}
+```
+
+---
+
+# 🔹 ADMIN FUNCTIONALITIES (Full Control)
+
+Admin Dashboard:
+
+```
+/admin/payroll
+```
+
+Admin can:
+
+### 1️⃣ Create Payroll Batch
+
+### 2️⃣ Generate Payslips
+
+### 3️⃣ Approve Batch
+
+### 4️⃣ Lock Batch
+
+### 5️⃣ Release Payslips
+
+Before LOCK:
+✔ Can regenerate
+✔ Can correct values
+
+After LOCK:
+❌ No editing
+
+After RELEASE:
+❌ Fully immutable
+
+---
+
+# 3️⃣ UPDATED SYSTEM FLOW
+
+```
+Admin Creates Batch
+        ↓
+Admin Generates Payroll
+        ↓
+Payslips Created (DRAFT)
+        ↓
+Manager Can View Summary Only
+        ↓
+Admin Approves
+        ↓
+Admin Locks
+        ↓
+Admin Releases
+        ↓
+Employee Can View Own Payslip
+```
+
+---
+
+# 4️⃣ DATABASE CONTROL LOGIC
+
+You don't need new tables.
+
+You only need:
+
+## A. Add Role Field in User Table
+
+```
+User
+-----
+id
+name
+email
+role (ADMIN / MANAGER / EMPLOYEE)
+```
+
+---
+
+## B. Add Status in Payslip Table
+
+```
+status:
+DRAFT
+APPROVED
+LOCKED
+RELEASED
+```
+
+---
+
+# 5️⃣ API ACCESS CONTROL MODEL
+
+Example middleware:
+
+```
+checkRole(["ADMIN"])
+checkRole(["MANAGER"])
+checkRole(["EMPLOYEE"])
+```
+
+---
+
+### Example:
+
+```
+POST /payroll/generate
+→ Only ADMIN
+```
+
+```
+GET /payroll/team-summary
+→ ADMIN + MANAGER
+```
+
+```
+GET /payslip/my
+→ EMPLOYEE only
+```
+
+---
+
+# 6️⃣ PROFESSIONAL ARCHITECTURE VIEW
+
+```
+Frontend (Role Based UI)
+        ↓
+RBAC Middleware
+        ↓
+Payroll Controller
+        ↓
+Payroll Service
+        ↓
+Database
+```
+
+---
+
+# 7️⃣ SECURITY BEHAVIOR SUMMARY
+
+| Stage    | Employee | Manager      | Admin        |
+| -------- | -------- | ------------ | ------------ |
+| DRAFT    | ❌        | View Summary | Full Control |
+| APPROVED | ❌        | View Summary | Control      |
+| LOCKED   | ❌        | View Summary | Limited      |
+| RELEASED | View Own | View Summary | View         |
+
+---
+

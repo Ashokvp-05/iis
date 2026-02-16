@@ -9,6 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { API_BASE_URL } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Loader2 } from "lucide-react"
@@ -34,7 +35,7 @@ export default function LeaveHistoryTable({ token }: { token: string }) {
 
     const fetchRequests = async () => {
         try {
-            const res = await fetch("http://localhost:4000/api/leaves/my-requests", {
+            const res = await fetch(`${API_BASE_URL}/leaves/history`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {

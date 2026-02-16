@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { isSameDay, parseISO } from "date-fns"
 import { Loader2 } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 interface AttendanceCalendarProps {
     token: string
@@ -17,7 +18,7 @@ export default function AttendanceCalendar({ token }: AttendanceCalendarProps) {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const res = await fetch("http://localhost:4000/api/time/history?limit=365", {
+                const res = await fetch(`${API_BASE_URL}/time/history?limit=365`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
                 if (res.ok) {

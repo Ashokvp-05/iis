@@ -88,7 +88,12 @@ export const getDashboardOverview = async () => {
         prisma.user.count({ where: { status: 'ACTIVE' } }),
         prisma.timeEntry.findMany({
             where: { status: 'ACTIVE', clockOut: null },
-            select: { clockType: true, clockIn: true, user: { select: { name: true } } }
+            select: {
+                id: true,
+                clockType: true,
+                clockIn: true,
+                user: { select: { id: true, name: true, department: true } }
+            }
         }),
         prisma.leaveRequest.count({ where: { status: 'PENDING' } }),
         prisma.user.count({ where: { status: UserStatus.PENDING } }),
@@ -126,11 +131,13 @@ export const getDashboardOverview = async () => {
     }
 
     const remoteUsers = activeSessions
-        .filter(s => s.clockType === 'REMOTE')
         .map(s => ({
+            id: s.user.id,
             name: s.user.name,
+            status: (s.clockType === 'REMOTE' ? 'REMOTE' : 'ONLINE') as any,
             clockIn: s.clockIn,
-            location: (s as any).location?.city || "Unknown"
+            location: (s as any).location?.city || (s.clockType === 'IN_OFFICE' ? 'Office HQ' : 'Unknown'),
+            department: s.user.department
         }));
 
     return {

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { format } from "date-fns"
+import { API_BASE_URL } from "@/lib/config"
 
 interface Holiday {
     id: string
@@ -21,7 +22,7 @@ export default function HolidayCalendar({ token }: { token: string }) {
     useEffect(() => {
         const fetchHolidays = async () => {
             try {
-                const res = await fetch(`http://localhost:4000/api/holidays?year=${new Date().getFullYear()}`, {
+                const res = await fetch(`${API_BASE_URL}/holidays?year=${new Date().getFullYear()}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
                 if (res.ok) {

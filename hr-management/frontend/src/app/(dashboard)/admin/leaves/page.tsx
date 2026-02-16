@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import AdminActionCenter from "@/components/admin/AdminActionCenter"
 import { Separator } from "@/components/ui/separator"
 import { Calendar } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 export default async function AdminLeavesPage() {
     const session = await auth()
@@ -19,7 +20,7 @@ export default async function AdminLeavesPage() {
     // Fetch all leave requests
     let leaves = []
     try {
-        const res = await fetch(`http://localhost:4000/api/leaves/all`, {
+        const res = await fetch(`${API_BASE_URL}/leaves/all`, {
             headers: { Authorization: `Bearer ${token}` },
             cache: 'no-store'
         })

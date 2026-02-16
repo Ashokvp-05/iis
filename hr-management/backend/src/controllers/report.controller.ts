@@ -4,7 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/db';
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export const getAttendanceReport = async (req: Request, res: Response) => {
     try {
@@ -36,11 +36,7 @@ export const getAttendanceReport = async (req: Request, res: Response) => {
                 }
             } else if (roleName === 'MANAGER') {
                 // Manager sees their DEPARTMENT.
-                // Constraint: Can specific queryUserId be used? Yes, but must be in their dept.
-                // For simplified "Report Page", we assume they want to see the whole team or themselves.
-                // Let's allow seeing the whole team first.
                 if (queryUserId) {
-                    // Advanced: Validate queryUserId is in dept. For now, let's just allow Department filter.
                     targetUserId = queryUserId as string;
                 } else {
                     targetUserId = undefined; // Don't filter by ID
@@ -135,6 +131,7 @@ export const exportExcel = async (req: Request, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+
 export const exportPDF = async (req: Request, res: Response) => {
     try {
         const { start, end, userId: queryUserId } = req.query;
@@ -164,7 +161,7 @@ export const exportPDF = async (req: Request, res: Response) => {
 
         const report = await timeEntryService.getReport(new Date(start as string), new Date(end as string), targetUserId, targetDepartment);
 
-        const doc = new jsPDF() as any;
+        const doc = new jsPDF();
 
         doc.setFontSize(18);
         doc.text('Attendance Report', 14, 22);
@@ -181,18 +178,18 @@ export const exportPDF = async (req: Request, res: Response) => {
             entry.hoursWorked ? Number(entry.hoursWorked).toFixed(2) : '0.00'
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 40,
             head: [['Employee', 'Date', 'Clock In', 'Clock Out', 'Type', 'Hours']],
             body: tableData,
             theme: 'striped',
-            headStyles: { fillStyle: [99, 102, 241] }
+            headStyles: { fillColor: [99, 102, 241] }
         });
 
         const pdfOutput = doc.output();
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=Attendance_Report_${start}.pdf`);
-        res.send(Buffer.from(pdfOutput, 'binary'));
+        res.send(Buffer.from(pdfOutput as any, 'binary'));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

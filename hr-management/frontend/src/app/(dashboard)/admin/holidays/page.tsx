@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Trash2, Plus, Calendar as CalendarIcon, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function HolidaysPage() {
     const { data: session } = useSession()
@@ -25,7 +26,7 @@ export default function HolidaysPage() {
 
     const fetchHolidays = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/holidays`, {
+            const res = await fetch(`${API_BASE_URL}/holidays`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {
@@ -43,7 +44,7 @@ export default function HolidaysPage() {
         if (!newHoliday.name || !newHoliday.date) return
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/holidays`, {
+            const res = await fetch(`${API_BASE_URL}/holidays`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -69,7 +70,7 @@ export default function HolidaysPage() {
 
     const handleDelete = async (id: string) => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/holidays/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/holidays/${id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` }
             })

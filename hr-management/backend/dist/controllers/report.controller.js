@@ -50,7 +50,7 @@ const timeEntryService = __importStar(require("../services/timeEntry.service"));
 const db_1 = __importDefault(require("../config/db"));
 const exceljs_1 = __importDefault(require("exceljs"));
 const jspdf_1 = require("jspdf");
-require("jspdf-autotable");
+const jspdf_autotable_1 = __importDefault(require("jspdf-autotable"));
 const getAttendanceReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -79,11 +79,7 @@ const getAttendanceReport = (req, res) => __awaiter(void 0, void 0, void 0, func
             }
             else if (roleName === 'MANAGER') {
                 // Manager sees their DEPARTMENT.
-                // Constraint: Can specific queryUserId be used? Yes, but must be in their dept.
-                // For simplified "Report Page", we assume they want to see the whole team or themselves.
-                // Let's allow seeing the whole team first.
                 if (queryUserId) {
-                    // Advanced: Validate queryUserId is in dept. For now, let's just allow Department filter.
                     targetUserId = queryUserId;
                 }
                 else {
@@ -215,12 +211,12 @@ const exportPDF = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             entry.clockType,
             entry.hoursWorked ? Number(entry.hoursWorked).toFixed(2) : '0.00'
         ]);
-        doc.autoTable({
+        (0, jspdf_autotable_1.default)(doc, {
             startY: 40,
             head: [['Employee', 'Date', 'Clock In', 'Clock Out', 'Type', 'Hours']],
             body: tableData,
             theme: 'striped',
-            headStyles: { fillStyle: [99, 102, 241] }
+            headStyles: { fillColor: [99, 102, 241] }
         });
         const pdfOutput = doc.output();
         res.setHeader('Content-Type', 'application/pdf');

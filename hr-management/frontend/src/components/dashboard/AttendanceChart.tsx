@@ -5,6 +5,7 @@ import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianG
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, TrendingUp, Clock } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function AttendanceChart({ token }: { token: string }) {
     const [chartData, setChartData] = useState<any[]>([])
@@ -14,8 +15,7 @@ export default function AttendanceChart({ token }: { token: string }) {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
-                const res = await fetch(`${apiUrl}/time/history?limit=50`, {
+                const res = await fetch(`${API_BASE_URL}/time/history?limit=50`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
 

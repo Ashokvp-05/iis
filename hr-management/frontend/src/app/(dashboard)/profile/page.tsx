@@ -29,7 +29,7 @@ import {
     Fingerprint,
     Activity
 } from "lucide-react"
-import { format } from "date-fns"
+import { format, startOfWeek, endOfWeek } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -59,10 +59,10 @@ import { toast } from "sonner"
 import { API_BASE_URL } from "@/lib/config"
 
 const profileSchema = z.object({
-    name: z.string().min(2, "Name must be at least 2 characters."),
-    email: z.string().email("Please enter a valid email address."),
-    phone: z.string().min(10, "Phone number must be valid.").optional().or(z.literal("")),
-    discordId: z.string().optional().or(z.literal("")),
+    name: z.string().min(1, "Legal Designation is required.").regex(/^[a-zA-Z\s]+$/, "Name must only contain letters."),
+    email: z.string().min(1, "Digital Coordinate is required.").email("Please enter a valid email address."),
+    phone: z.string().regex(/^\+91\d{10}$/, "Phone must be in +91XXXXXXXXXX format.").min(1, "Voice Link is required."),
+    discordId: z.string().regex(/^\d{17,19}$/, "Grid ID must be 17-19 digits.").min(1, "Discord ID is required."),
 })
 
 const passwordSchema = z.object({
@@ -84,6 +84,7 @@ export default function ProfilePage() {
     const [mount, setMount] = useState(false)
 
     const [userData, setUserData] = useState<any>(null)
+    const [weeklyHours, setWeeklyHours] = useState("0.00")
 
     const form = useForm<z.infer<typeof profileSchema>>({
         resolver: zodResolver(profileSchema),
@@ -108,6 +109,7 @@ export default function ProfilePage() {
         setMount(true)
         const fetchProfile = async () => {
             const token = (session?.user as any)?.accessToken
+            const userId = (session?.user as any)?.id
             if (!token) return
             try {
                 const res = await fetch(`${API_BASE_URL}/profile`, {
@@ -119,10 +121,25 @@ export default function ProfilePage() {
                     form.reset({
                         name: data.name || "",
                         email: data.email || "",
-                        phone: data.phone || "",
+                        phone: data.phone && data.phone.startsWith('+91') ? data.phone : `+91${(data.phone || "").replace(/^\+91/, '')}`,
                         discordId: data.discordId || "",
                     })
                 }
+
+                // Fetch Weekly Hours
+                const start = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()
+                const end = endOfWeek(new Date(), { weekStartsOn: 1 }).toISOString()
+                const reportRes = await fetch(`${API_BASE_URL}/reports/attendance?start=${start}&end=${end}&userId=${userId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                if (reportRes.ok) {
+                    const reportData = await reportRes.json()
+                    const total = Array.isArray(reportData)
+                        ? reportData.reduce((acc: number, curr: any) => acc + (Number(curr.hoursWorked) || 0), 0)
+                        : 0
+                    setWeeklyHours(total.toFixed(2))
+                }
+
             } catch (e) {
                 console.error("Failed to load profile", e)
             } finally {
@@ -209,15 +226,62 @@ export default function ProfilePage() {
                 {/* COMPACT PREMIUM PROFILE HEADER */}
                 <div className="relative flex items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-6">
-                        <div className="relative">
-                            <Avatar className="h-20 w-20 border-[4px] border-white dark:border-slate-900 shadow-xl items-center justify-center bg-slate-100 dark:bg-slate-800">
+                        <div className="relative group cursor-pointer" onClick={() => document.getElementById('avatar-upload')?.click()}>
+                            <Avatar className="h-20 w-20 border-[4px] border-white dark:border-slate-900 shadow-xl items-center justify-center bg-slate-100 dark:bg-slate-800 transition-transform group-hover:scale-105">
+                                <AvatarImage src={userData?.avatarUrl} className="object-cover" />
                                 <AvatarFallback className="text-3xl font-black text-slate-300 dark:text-slate-600 font-mono">
                                     {fetchLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : initial}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 text-white rounded-lg shadow-md">
+                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <User className="w-6 h-6 text-white" />
+                            </div>
+                            <div className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 text-white rounded-lg shadow-md z-10">
                                 <ShieldCheck className="w-3 h-3" />
                             </div>
+                            <input
+                                type="file"
+                                id="avatar-upload"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (!file) return
+
+                                    if (file.size > 5 * 1024 * 1024) {
+                                        toast.error("Image too large (max 5MB)")
+                                        return
+                                    }
+
+                                    const reader = new FileReader()
+                                    reader.onloadend = async () => {
+                                        const base64 = reader.result as string
+                                        try {
+                                            const token = (session?.user as any)?.accessToken
+                                            const res = await fetch(`${API_BASE_URL}/profile/avatar`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    Authorization: `Bearer ${token}`
+                                                },
+                                                body: JSON.stringify({ avatarUrl: base64 })
+                                            })
+
+                                            if (res.ok) {
+                                                const data = await res.json()
+                                                setUserData({ ...userData, avatarUrl: data.avatarUrl })
+                                                await update({ ...session, user: { ...session?.user, image: data.avatarUrl } })
+                                                toast.success("Avatar updated")
+                                            } else {
+                                                throw new Error("Failed to upload")
+                                            }
+                                        } catch (err) {
+                                            toast.error("Failed to update avatar")
+                                        }
+                                    }
+                                    reader.readAsDataURL(file)
+                                }}
+                            />
                         </div>
                         <div className="space-y-1">
                             <div className="flex items-center gap-3">
@@ -308,7 +372,7 @@ export default function ProfilePage() {
                                                         <FormControl>
                                                             <div className="relative group">
                                                                 <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                                                                <Input className="h-10 pl-9 border-slate-200 dark:border-slate-800 rounded-xl font-bold bg-slate-50/50 dark:bg-slate-800/20 text-sm focus:ring-0 focus:border-indigo-500 transition-all" placeholder="+1 000 000 000" {...field} />
+                                                                <Input className="h-10 pl-9 border-slate-200 dark:border-slate-800 rounded-xl font-bold bg-slate-50/50 dark:bg-slate-800/20 text-sm focus:ring-0 focus:border-indigo-500 transition-all" placeholder="+91 00000 00000" {...field} />
                                                             </div>
                                                         </FormControl>
                                                         <FormMessage className="text-[9px] uppercase font-black tracking-widest" />
@@ -426,7 +490,8 @@ export default function ProfilePage() {
                             <CardContent className="p-4 space-y-3">
                                 {[
                                     { label: "Designation", value: roleName, icon: Activity },
-                                    { label: "Operation", value: userData?.workMode || "Hybrid", icon: Clock }
+                                    { label: "Operation", value: userData?.workMode || "Hybrid", icon: Clock },
+                                    { label: "Weekly Log", value: `${weeklyHours} Hrs`, icon: Clock }
                                 ].map((item, i) => (
                                     <div key={i} className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50/50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800/50 transition-all hover:border-indigo-100 dark:hover:border-indigo-900/30">
                                         <div className="flex items-center gap-2">

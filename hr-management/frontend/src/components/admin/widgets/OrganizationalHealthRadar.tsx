@@ -7,20 +7,25 @@ import {
     BarChart,
     XAxis,
     YAxis,
-    CartesianGrid,
     Tooltip,
     ResponsiveContainer,
     Cell
 } from "recharts"
-import { ShieldCheck, Activity, Loader2, Zap, TrendingUp, Cpu, Lock, Shield, Gauge } from "lucide-react"
+import { Loader2, TrendingUp, Cpu, Lock, Shield, Gauge, Zap } from "lucide-react"
+
+interface HealthMetric {
+    subject: string;
+    A: number;
+    fullMark: number;
+}
 
 export function OrganizationalHealthRadar({ token }: { token: string }) {
     const [loading, setLoading] = useState(true)
-    const [performanceData, setPerformanceData] = useState<any[]>([])
+    const [performanceData, setPerformanceData] = useState<HealthMetric[]>([])
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            const mockData = [
+            const mockData: HealthMetric[] = [
                 { subject: 'Stability', A: 120, fullMark: 150 },
                 { subject: 'Velocity', A: 98, fullMark: 150 },
                 { subject: 'Safety', A: 140, fullMark: 150 },
@@ -99,7 +104,7 @@ export function OrganizationalHealthRadar({ token }: { token: string }) {
                                 content={({ active, payload }) => {
                                     if (active && payload && payload.length) {
                                         return (
-                                            <div className="glass p-3 rounded-xl border border-white/10 shadow-2xl">
+                                            <div className="glass p-3 rounded-xl border border-white/10 shadow-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
                                                 <p className="text-[10px] font-black text-indigo-500 uppercase mb-1">{payload[0].payload.subject}</p>
                                                 <p className="text-xl font-black">{payload[0].value}<span className="text-xs text-muted-foreground ml-1">/ 150</span></p>
                                             </div>
@@ -113,7 +118,7 @@ export function OrganizationalHealthRadar({ token }: { token: string }) {
                                 radius={6}
                                 background={{ fill: 'rgba(0,0,0,0.05)', radius: 6 }}
                             >
-                                {performanceData.map((entry, index) => (
+                                {performanceData.map((_entry, index) => (
                                     <Cell
                                         key={`cell-${index}`}
                                         fill={index === 0 ? '#6366f1' : index === 1 ? '#818cf8' : index === 2 ? '#f43f5e' : index === 3 ? '#fbbf24' : '#10b981'}

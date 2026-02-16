@@ -13,8 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { LifeBuoy, Plus, AlertCircle, Clock, CheckCircle2, MessageSquare, Send, User, Calendar } from "lucide-react"
+import { LifeBuoy, Plus, AlertCircle, Clock, CheckCircle2, MessageSquare, Send, User, Calendar, Loader2 } from "lucide-react"
 import { format } from "date-fns"
+import { API_BASE_URL } from "@/lib/config"
 
 interface TicketComment {
     id: string
@@ -63,14 +64,33 @@ export default function SupportPage() {
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
     const [newComment, setNewComment] = useState("")
     const [isSheetOpen, setIsSheetOpen] = useState(false)
+    const [allUsers, setAllUsers] = useState<any[]>([])
+    const [assigning, setAssigning] = useState<string | null>(null)
 
     useEffect(() => {
-        if (token) fetchTickets()
-    }, [token])
+        if (token) {
+            fetchTickets()
+            if (isAdmin) fetchUsers()
+        }
+    }, [token, isAdmin])
+
+    const fetchUsers = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/users`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setAllUsers(data)
+            }
+        } catch (e) {
+            console.error("Failed to fetch users")
+        }
+    }
 
     const fetchTickets = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickets`, {
+            const res = await fetch(`${API_BASE_URL}/tickets`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {
@@ -96,7 +116,7 @@ export default function SupportPage() {
         }
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickets`, {
+            const res = await fetch(`${API_BASE_URL}/tickets`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -110,15 +130,18 @@ export default function SupportPage() {
                 setOpen(false)
                 setNewTicket({ title: "", description: "", priority: "MEDIUM", category: "BUG" })
                 fetchTickets()
+            } else {
+                const err = await res.json().catch(() => ({ message: "Server error" }));
+                toast({ title: "Error", description: err.message || "Failed to create ticket", variant: "destructive" })
             }
         } catch (error) {
-            toast({ title: "Error", description: "Failed to create ticket", variant: "destructive" })
+            toast({ title: "Error", description: "Network error occurred", variant: "destructive" })
         }
     }
 
     const handleStatusUpdate = async (id: string, newStatus: string) => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickets/${id}/status`, {
+            const res = await fetch(`${API_BASE_URL}/tickets/${id}/status`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -140,7 +163,7 @@ export default function SupportPage() {
         if (!selectedTicket || !newComment.trim()) return
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickets/${selectedTicket.id}/comments`, {
+            const res = await fetch(`${API_BASE_URL}/tickets/${selectedTicket.id}/comments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -155,6 +178,30 @@ export default function SupportPage() {
             }
         } catch (error) {
             toast({ title: "Error", description: "Failed to post comment", variant: "destructive" })
+        }
+    }
+
+    const handleAssign = async (userId: string) => {
+        if (!selectedTicket) return
+        setAssigning(userId)
+        try {
+            const res = await fetch(`${API_BASE_URL}/tickets/${selectedTicket.id}/assign`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ assignedToId: userId })
+            })
+
+            if (res.ok) {
+                toast({ title: "Assigned", description: "Ticket assigned successfully" })
+                fetchTickets()
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to assign ticket", variant: "destructive" })
+        } finally {
+            setAssigning(null)
         }
     }
 
@@ -380,6 +427,37 @@ export default function SupportPage() {
                                 <SheetDescription>
                                     Ticket ID: {selectedTicket.id.slice(0, 8)} • Created by {selectedTicket.user?.name || "Unknown"}
                                 </SheetDescription>
+
+                                {isAdmin && (
+                                    <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-indigo-200 dark:border-indigo-900/50">
+                                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 block">Personnel Assignment</label>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1">
+                                                <Select
+                                                    value={(selectedTicket as any).assignedToId || "unassigned"}
+                                                    onValueChange={handleAssign}
+                                                    disabled={!!assigning}
+                                                >
+                                                    <SelectTrigger className="w-full bg-white dark:bg-slate-950 font-bold text-xs h-10 border-indigo-100">
+                                                        <SelectValue placeholder="Assign personnel..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                        {allUsers.map(u => (
+                                                            <SelectItem key={u.id} value={u.id}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-black">{u.name.charAt(0)}</div>
+                                                                    {u.name}
+                                                                </div>
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            {assigning && <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />}
+                                        </div>
+                                    </div>
+                                )}
                             </SheetHeader>
 
                             <div className="flex-1 overflow-y-auto pr-2 space-y-6">

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Loader2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { API_BASE_URL } from "@/lib/config"
 
 interface User {
     id: string
@@ -41,7 +42,7 @@ export default function EmployeeTable({ token }: { token: string }) {
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch("http://localhost:4000/api/users", {
+            const res = await fetch(`${API_BASE_URL}/users`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {

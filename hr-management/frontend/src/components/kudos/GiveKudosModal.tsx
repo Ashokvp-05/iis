@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trophy, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { API_BASE_URL } from "@/lib/config"
 
 export function GiveKudosModal({ token, users }: { token: string, users: any[] }) {
     const [open, setOpen] = useState(false)
@@ -27,7 +28,7 @@ export function GiveKudosModal({ token, users }: { token: string, users: any[] }
         setLoading(true)
 
         try {
-            const res = await fetch("http://localhost:4000/api/kudos", {
+            const res = await fetch(`${API_BASE_URL}/kudos`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -92,6 +92,49 @@ async function main() {
 
     console.log({ admin, employee, manager });
 
+    // --- CREATE SALARY CONFIGS (For Payroll Engine) ---
+    console.log('Seeding salary configurations...');
+    const salaryConfigs = [
+        {
+            userId: admin.id,
+            basicSalary: 65000,
+            hra: 25000,
+            da: 10000,
+            bonus: 5000,
+            pf: 5000,
+            tax: 8000,
+            otherAllowances: 2000
+        },
+        {
+            userId: manager.id,
+            basicSalary: 55000,
+            hra: 20000,
+            da: 8000,
+            bonus: 4000,
+            pf: 4500,
+            tax: 6000,
+            otherAllowances: 1500
+        },
+        {
+            userId: employee.id,
+            basicSalary: 45000,
+            hra: 15000,
+            da: 6000,
+            bonus: 3000,
+            pf: 4000,
+            tax: 4000,
+            otherAllowances: 1000
+        }
+    ];
+
+    for (const sc of salaryConfigs) {
+        await (prisma as any).salaryConfig.upsert({
+            where: { userId: sc.userId },
+            update: { ...sc },
+            create: { ...sc }
+        });
+    }
+
     // --- MOCK ATTENDANCE DATA (Last 7 Days) ---
     console.log('Seeding attendance data...');
     const now = new Date();

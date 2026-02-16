@@ -93,7 +93,12 @@ const getDashboardOverview = () => __awaiter(void 0, void 0, void 0, function* (
         db_1.default.user.count({ where: { status: 'ACTIVE' } }),
         db_1.default.timeEntry.findMany({
             where: { status: 'ACTIVE', clockOut: null },
-            select: { clockType: true, clockIn: true, user: { select: { name: true } } }
+            select: {
+                id: true,
+                clockType: true,
+                clockIn: true,
+                user: { select: { id: true, name: true, department: true } }
+            }
         }),
         db_1.default.leaveRequest.count({ where: { status: 'PENDING' } }),
         db_1.default.user.count({ where: { status: client_1.UserStatus.PENDING } }),
@@ -126,13 +131,15 @@ const getDashboardOverview = () => __awaiter(void 0, void 0, void 0, function* (
         alerts.push({ type: 'info', message: 'Low attendance today (<50%)' });
     }
     const remoteUsers = activeSessions
-        .filter(s => s.clockType === 'REMOTE')
         .map(s => {
         var _a;
         return ({
+            id: s.user.id,
             name: s.user.name,
+            status: (s.clockType === 'REMOTE' ? 'REMOTE' : 'ONLINE'),
             clockIn: s.clockIn,
-            location: ((_a = s.location) === null || _a === void 0 ? void 0 : _a.city) || "Unknown"
+            location: ((_a = s.location) === null || _a === void 0 ? void 0 : _a.city) || (s.clockType === 'IN_OFFICE' ? 'Office HQ' : 'Unknown'),
+            department: s.user.department
         });
     });
     return {

@@ -21,7 +21,8 @@ import {
     Clock,
     Zap,
     SearchX,
-    RotateCcw
+    RotateCcw,
+    X
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
@@ -100,23 +101,35 @@ export default function AdminReportsPage() {
         }
     }
 
+    const [activeFilter, setActiveFilter] = useState<string | null>(null)
+
     // Processed Data
     const filteredData = useMemo(() => {
-        return reportData.filter(item =>
+        let data = reportData.filter(item =>
             item.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.user.email.toLowerCase().includes(searchQuery.toLowerCase())
         )
-    }, [reportData, searchQuery])
+
+        if (activeFilter === "REMOTE") {
+            data = data.filter(i => i.clockType === 'REMOTE')
+        } else if (activeFilter === "ACTIVE") {
+            data = data.filter(i => !i.clockOut)
+        }
+
+        return data
+    }, [reportData, searchQuery, activeFilter])
 
     const stats = useMemo(() => {
         const totalHours = reportData.reduce((acc, curr) => acc + (Number(curr.hoursWorked) || 0), 0)
         const entries = reportData.length
         const remoteCount = reportData.filter(i => i.clockType === 'REMOTE').length
+        const activeCount = reportData.filter(i => !i.clockOut).length
         const avgHours = entries > 0 ? totalHours / entries : 0
 
         return {
             totalHours: totalHours.toFixed(1),
             entries,
+            activeCount,
             remotePercentage: entries > 0 ? ((remoteCount / entries) * 100).toFixed(0) : "0",
             avgHours: avgHours.toFixed(1)
         }
@@ -157,6 +170,16 @@ export default function AdminReportsPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                    {activeFilter && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveFilter(null)}
+                            className="text-[10px] font-black uppercase text-indigo-500 hover:text-indigo-600 gap-2 border border-indigo-200 bg-indigo-50/50 rounded-xl px-4"
+                        >
+                            <X className="w-3 h-3" /> Clear Filters
+                        </Button>
+                    )}
                     <div className="flex bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
                         <Button
                             variant="ghost"
@@ -187,7 +210,7 @@ export default function AdminReportsPage() {
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">
                                     <Skeleton className="h-12 w-12 rounded-2xl" />
-                                    <div className="space-y-2 text-right text-right ml-auto">
+                                    <div className="space-y-2 text-right ml-auto">
                                         <Skeleton className="h-3 w-20 ml-auto" />
                                         <Skeleton className="h-8 w-24 ml-auto" />
                                     </div>
@@ -197,12 +220,16 @@ export default function AdminReportsPage() {
                     ))
                 ) : (
                     [
-                        { label: "Aggregate Hours", value: `${stats.totalHours}h`, icon: Clock, color: "text-indigo-600", bg: "bg-indigo-50 dark:bg-indigo-900/20" },
-                        { label: "Active Sessions", value: stats.entries, icon: Users, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-                        { label: "Work Intensity", value: `${stats.avgHours}h`, icon: Zap, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" },
-                        { label: "Remote Factor", value: `${stats.remotePercentage}%`, icon: TrendingUp, color: "text-fuchsia-600", bg: "bg-fuchsia-50 dark:bg-fuchsia-900/20" }
+                        { id: 'total', label: "Aggregate Hours", value: `${stats.totalHours}h`, icon: Clock, color: "text-indigo-600", bg: "bg-indigo-50 dark:bg-indigo-900/20" },
+                        { id: 'ACTIVE', label: "Live Sessions", value: stats.activeCount, icon: Zap, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" },
+                        { id: 'entries', label: "Check-ins Today", value: stats.entries, icon: Users, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+                        { id: 'REMOTE', label: "Remote Factor", value: `${stats.remotePercentage}%`, icon: TrendingUp, color: "text-fuchsia-600", bg: "bg-fuchsia-50 dark:bg-fuchsia-900/20" }
                     ].map((stat, i) => (
-                        <Card key={i} className="border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden bg-white dark:bg-slate-900 transform transition-all hover:scale-[1.02] hover:shadow-md hover:ring-indigo-200/50">
+                        <Card
+                            key={i}
+                            onClick={() => ['REMOTE', 'ACTIVE'].includes(stat.id) && setActiveFilter(stat.id)}
+                            className={`border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden bg-white dark:bg-slate-900 transform transition-all hover:scale-[1.02] hover:shadow-md cursor-pointer ${activeFilter === stat.id ? 'ring-2 ring-indigo-500' : 'hover:ring-indigo-200/50'}`}
+                        >
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">
                                     <div className={`p-3 rounded-2xl ${stat.bg} ${stat.color}`}>
@@ -262,8 +289,16 @@ export default function AdminReportsPage() {
                                 placeholder="Search employees or emails..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-11 pl-10 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 rounded-xl focus:ring-indigo-500 w-full font-medium"
+                                className="h-11 pl-10 pr-10 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 rounded-xl focus:ring-indigo-500 w-full font-medium"
                             />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </CardContent>

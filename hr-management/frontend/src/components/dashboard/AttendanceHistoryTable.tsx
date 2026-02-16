@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, MapPin, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Loader2, MapPin, AlertCircle, CheckCircle2, Calendar as CalendarIcon, FilterX } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
+import { cn } from "@/lib/utils"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
+import { format } from "date-fns"
 
 interface TimeEntry {
     id: string
@@ -25,12 +31,13 @@ interface TimeEntry {
 export default function AttendanceHistoryTable({ token }: { token: string }) {
     const [history, setHistory] = useState<TimeEntry[]>([])
     const [loading, setLoading] = useState(true)
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
 
     useEffect(() => {
         const fetchHistory = async () => {
             try {
                 // Fetch last 30 entries
-                const res = await fetch("http://localhost:4000/api/time/history?limit=30", {
+                const res = await fetch(`${API_BASE_URL}/time/history?limit=30`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
                 if (res.ok) {
@@ -46,12 +53,46 @@ export default function AttendanceHistoryTable({ token }: { token: string }) {
         fetchHistory()
     }, [token])
 
+    const filteredHistory = selectedDate
+        ? history.filter(entry =>
+            new Date(entry.clockIn).toLocaleDateString() === selectedDate.toLocaleDateString()
+        )
+        : history
+
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
 
     return (
         <Card className="border-none shadow-md">
-            <CardHeader>
-                <CardTitle>Attendance Log (Last 30 Days)</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle>Attendance Log</CardTitle>
+                <div className="flex items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className={cn("h-8 text-[10px] font-black uppercase tracking-widest", selectedDate && "text-indigo-600 border-indigo-200")}>
+                                <CalendarIcon className="w-3 h-3 mr-2" />
+                                {selectedDate ? format(selectedDate, "PP") : "Filter Date"}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={setSelectedDate}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    {selectedDate && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-indigo-600"
+                            onClick={() => setSelectedDate(undefined)}
+                        >
+                            <FilterX className="w-4 h-4" />
+                        </Button>
+                    )}
+                </div>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -65,14 +106,14 @@ export default function AttendanceHistoryTable({ token }: { token: string }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {history.length === 0 ? (
+                        {filteredHistory.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                                    No attendance records found.
+                                    {selectedDate ? "No attendance found for this date." : "No attendance records found."}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            history.map((entry) => {
+                            filteredHistory.map((entry) => {
                                 const date = new Date(entry.clockIn).toLocaleDateString()
                                 const timeIn = new Date(entry.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                 const timeOut = entry.clockOut ? new Date(entry.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"

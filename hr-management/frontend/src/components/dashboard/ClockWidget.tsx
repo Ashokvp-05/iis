@@ -9,6 +9,7 @@ import { Loader2, MapPin, Briefcase, Clock, PlayCircle, StopCircle } from "lucid
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function ClockWidget({ token }: { token: string }) {
     const [loading, setLoading] = useState(true)
@@ -39,7 +40,7 @@ export default function ClockWidget({ token }: { token: string }) {
 
     const fetchActiveEntry = async () => {
         try {
-            const res = await fetch("http://localhost:4000/api/time/active", {
+            const res = await fetch(`${API_BASE_URL}/time/active`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {
@@ -99,7 +100,7 @@ export default function ClockWidget({ token }: { token: string }) {
                 }
             }
 
-            const res = await fetch("http://localhost:4000/api/time/clock-in", {
+            const res = await fetch(`${API_BASE_URL}/time/clock-in`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -134,7 +135,7 @@ export default function ClockWidget({ token }: { token: string }) {
         setError("")
         setActionLoading(true)
         try {
-            const res = await fetch("http://localhost:4000/api/time/clock-out", {
+            const res = await fetch(`${API_BASE_URL}/time/clock-out`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` }
             })

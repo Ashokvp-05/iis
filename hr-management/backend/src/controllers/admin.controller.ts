@@ -106,14 +106,12 @@ export const getAuditLogs = async (req: Request, res: Response) => {
             select: { id: true, name: true, designation: true, department: true }
         });
 
-        const adminMap = admins.reduce((acc: any, admin) => {
-            acc[admin.id] = admin;
-            return acc;
-        }, {});
+        // Use a Map for O(1) lookups
+        const adminMap = new Map(admins.map(a => [a.id, a]));
 
         const enrichedLogs = logs.map(log => ({
             ...log,
-            admin: adminMap[log.adminId] || { name: 'Unknown System', designation: 'System' }
+            admin: adminMap.get(log.adminId) || { name: 'System', designation: 'Automated' }
         }));
 
         res.json(enrichedLogs);

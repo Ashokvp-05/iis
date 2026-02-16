@@ -15,5 +15,6 @@ router.post('/2fa/verify', authController.verify2FALogin);
 router.post('/2fa/setup', authenticate as any, authController.setup2FA);
 router.post('/2fa/activate', authenticate as any, authController.activate2FA);
 router.post('/2fa/disable', authenticate as any, authController.disable2FA);
+router.post('/logout-others', authenticate as any, authController.logoutOthers);
 
 export default router;

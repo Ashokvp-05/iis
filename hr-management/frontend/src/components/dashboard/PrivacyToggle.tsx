@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Shield } from "lucide-react"
 
 export function PrivacyToggle() {
     const [isPrivacy, setIsPrivacy] = useState(false)
@@ -20,10 +20,14 @@ export function PrivacyToggle() {
             variant="ghost"
             size="sm"
             onClick={() => setIsPrivacy(!isPrivacy)}
-            className={`gap-2 font-medium transition-colors ${isPrivacy ? 'text-indigo-300 bg-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            className={`h-10 px-5 rounded-2xl gap-3 font-black uppercase text-[9px] tracking-[0.2em] transition-all border ${isPrivacy
+                    ? 'text-rose-400 bg-rose-500/10 border-rose-500/30'
+                    : 'text-slate-300 bg-white/5 border-white/10 hover:text-white hover:bg-white/20'
+                }`}
         >
             {isPrivacy ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            {isPrivacy ? "Hidden" : "Visible"}
+            {isPrivacy ? "Encrypted" : "Decrypted"}
+            <Shield className={`w-3 h-3 ${isPrivacy ? 'text-rose-500' : 'text-slate-500'}`} />
         </Button>
     )
 }

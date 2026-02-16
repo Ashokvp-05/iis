@@ -12,6 +12,7 @@ const registerSchema = z.object({
     password: z.string().min(6),
     name: z.string().min(2),
     roleId: z.string().optional(),
+    roleName: z.string().optional(), // Added roleName support
     department: z.string().optional(),
     designation: z.string().optional()
 });
@@ -22,7 +23,7 @@ const loginSchema = z.object({
 });
 
 export const requestRegistration = async (data: z.infer<typeof registerSchema>) => {
-    const { email, password, name, roleId, department, designation } = registerSchema.parse(data);
+    const { email, password, name, roleId, roleName, department, designation } = registerSchema.parse(data);
 
     const existingUser = await prisma.user.findUnique({
         where: { email },
@@ -35,11 +36,24 @@ export const requestRegistration = async (data: z.infer<typeof registerSchema>) 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let finalRoleId = roleId;
+
+    // If no ID provided, try to find by Name, or default to EMPLOYEE
     if (!finalRoleId) {
-        const employeeRole = await prisma.role.findUnique({
-            where: { name: 'EMPLOYEE' }
+        const targetRoleName = roleName ? roleName.toUpperCase() : 'EMPLOYEE';
+
+        const role = await prisma.role.findUnique({
+            where: { name: targetRoleName }
         });
-        finalRoleId = employeeRole?.id;
+
+        // Fallback to EMPLOYEE if specific role not found (safety net)
+        if (!role && targetRoleName !== 'EMPLOYEE') {
+            const employeeRole = await prisma.role.findUnique({
+                where: { name: 'EMPLOYEE' }
+            });
+            finalRoleId = employeeRole?.id;
+        } else {
+            finalRoleId = role?.id;
+        }
     }
 
     const user = await prisma.user.create({
@@ -106,7 +120,8 @@ export const verifyCredentials = async (data: z.infer<typeof loginSchema>) => {
             email: user.email,
             roleId: user.roleId,
             role: user.role?.name,
-            status: user.status
+            status: user.status,
+            tokenVersion: (user as any).tokenVersion
         },
         process.env.JWT_SECRET || 'super-secret-key',
         { expiresIn: '1d' }
@@ -148,7 +163,8 @@ export const verify2FALogin = async (userId: string, code: string) => {
             email: user.email,
             roleId: user.roleId,
             role: user.role?.name,
-            status: user.status
+            status: user.status,
+            tokenVersion: (user as any).tokenVersion
         },
         process.env.JWT_SECRET || 'super-secret-key',
         { expiresIn: '1d' }
@@ -269,5 +285,12 @@ export const changePassword = async (userId: string, currentPass: string, newPas
     return prisma.user.update({
         where: { id: userId },
         data: { password: hashedPassword }
+    });
+};
+
+export const logoutOthers = async (userId: string) => {
+    return prisma.user.update({
+        where: { id: userId },
+        data: { tokenVersion: { increment: 1 } } as any
     });
 };

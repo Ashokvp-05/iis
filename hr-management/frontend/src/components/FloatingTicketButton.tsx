@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { LifeBuoy, PlusCircle, List, CheckCircle2, Clock, XCircle, AlertCircle, Loader2, Copy, BarChart3, Link as LinkIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function FloatingTicketButton() {
     const { data: session } = useSession()
@@ -38,7 +39,7 @@ export default function FloatingTicketButton() {
         if (!token) return
         setLoading(true)
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickets`, {
+            const res = await fetch(`${API_BASE_URL}/tickets`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {
@@ -74,7 +75,7 @@ export default function FloatingTicketButton() {
                 attachments: newTicket.attachments ? [newTicket.attachments] : [] // Backend expects Json array
             }
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickets`, {
+            const res = await fetch(`${API_BASE_URL}/tickets`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

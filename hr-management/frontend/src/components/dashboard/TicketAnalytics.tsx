@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { AlertCircle, CheckCircle2, Clock, Activity, BarChart3, TrendingUp, Bug } from "lucide-react"
 import { motion } from "framer-motion"
+import { API_BASE_URL } from "@/lib/config"
 
 interface TicketAnalyticsData {
     total: number
@@ -20,7 +21,7 @@ export function TicketAnalytics({ token }: { token: string }) {
         const fetchAnalytics = async () => {
             try {
                 // Adjust port if necessary, typically 4000 for backend
-                const res = await fetch("http://localhost:4000/api/tickets/analytics", {
+                const res = await fetch(`${API_BASE_URL}/tickets/analytics`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
                 if (res.ok) {

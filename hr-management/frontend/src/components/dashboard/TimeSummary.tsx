@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Activity, CalendarDays, Clock } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function TimeSummary({ token }: { token: string }) {
     const [summary, setSummary] = useState<any>(null)
@@ -11,8 +12,7 @@ export default function TimeSummary({ token }: { token: string }) {
     useEffect(() => {
         const fetchSummary = async () => {
             try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
-                const res = await fetch(`${apiUrl}/time/summary`, {
+                const res = await fetch(`${API_BASE_URL}/time/summary`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
                 if (res.ok) {

@@ -42,7 +42,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.disable2FA = exports.activate2FA = exports.setup2FA = exports.verify2FALogin = exports.changePassword = exports.resetPassword = exports.forgotPassword = exports.login = exports.register = void 0;
+exports.logoutOthers = exports.disable2FA = exports.activate2FA = exports.setup2FA = exports.verify2FALogin = exports.changePassword = exports.resetPassword = exports.forgotPassword = exports.login = exports.register = void 0;
 const authService = __importStar(require("../services/auth.service"));
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -142,3 +142,14 @@ const disable2FA = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.disable2FA = disable2FA;
+const logoutOthers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const userId = req.user.id;
+        yield authService.logoutOthers(userId);
+        res.status(200).json({ message: 'All other devices logged out successfully. Future requests from those devices will require a fresh login.' });
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+exports.logoutOthers = logoutOthers;

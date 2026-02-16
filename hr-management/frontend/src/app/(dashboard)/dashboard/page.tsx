@@ -26,23 +26,28 @@ import {
     Calculator
 } from "lucide-react"
 
+import dynamic from "next/dynamic"
+
+import { format, startOfMonth, endOfMonth, isSameDay, differenceInBusinessDays } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import ClockWidget from "@/components/dashboard/ClockWidget"
-import TimeSummary from "@/components/dashboard/TimeSummary"
-import TeamAvailabilityWidget from "@/components/dashboard/TeamAvailabilityWidget"
-import AttendanceChart from "@/components/dashboard/AttendanceChart"
-import NotificationBell from "@/components/layout/NotificationBell"
-import { ProductivityAnalytics } from "@/components/dashboard/ProductivityAnalytics"
-import { TicketAnalytics } from "@/components/dashboard/TicketAnalytics"
-import { UpcomingEventsWidget } from "@/components/dashboard/UpcomingEventsWidget"
-import { AnnouncementBanner } from "@/components/dashboard/AnnouncementBanner"
-import ProfessionalStatusWidget from "@/components/dashboard/ProfessionalStatusWidget"
-import MoodPulseWidget from "@/components/dashboard/MoodPulseWidget"
-import SystemStatusWidget from "@/components/dashboard/SystemStatusWidget"
-import SmartFocusWidget from "@/components/dashboard/SmartFocusWidget"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Dynamic Imports for Performance Optimization
+const ClockWidget = dynamic(() => import("@/components/dashboard/ClockWidget"), {
+    loading: () => <Skeleton className="h-[300px] w-full rounded-[2.5rem]" />
+})
+const AttendanceChart = dynamic(() => import("@/components/dashboard/AttendanceChart"), {
+    loading: () => <Skeleton className="h-[250px] w-full rounded-xl" />
+})
+const ProductivityAnalytics = dynamic(() => import("@/components/dashboard/ProductivityAnalytics").then(mod => mod.ProductivityAnalytics), {
+    loading: () => <Skeleton className="h-[200px] w-full rounded-[2.5rem]" />
+})
+const AnnouncementBanner = dynamic(() => import("@/components/dashboard/AnnouncementBanner").then(mod => mod.AnnouncementBanner), {
+    loading: () => <Skeleton className="h-12 w-full mb-8 rounded-xl" />
+})
 
 
 export default async function DashboardPage() {
@@ -68,25 +73,55 @@ export default async function DashboardPage() {
     // Fetch Real Stats from Backend
     let summary = { totalHours: "0.00", overtimeHours: "0.00", daysWorked: 0 }
     let leaveBalance = { sick: 0, casual: 0, earned: 0 }
+    let latestPayslip = null
+    let todayEvents: any[] = []
+
+    const todayDate = new Date()
+    const startOfMonthDate = startOfMonth(todayDate)
+    const workingDaysSoFar = Math.max(1, differenceInBusinessDays(todayDate, startOfMonthDate) + 1)
+    const todayIso = format(todayDate, 'yyyy-MM-dd')
 
     try {
-        const [summaryRes, balanceRes] = await Promise.all([
+        const [summaryRes, balanceRes, payslipRes, calendarRes] = await Promise.all([
             fetch(`${API_BASE_URL}/time/summary`, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(`${API_BASE_URL}/leaves/balance`, { headers: { Authorization: `Bearer ${token}` } })
+            fetch(`${API_BASE_URL}/leaves/balance`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_BASE_URL}/payslips/my`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_BASE_URL}/calendar?start=${todayIso}&end=${todayIso}`, { headers: { Authorization: `Bearer ${token}` } })
         ])
 
         if (summaryRes.ok) summary = await summaryRes.json()
         if (balanceRes.ok) leaveBalance = await balanceRes.json()
+
+        if (payslipRes.ok) {
+            const payslips = await payslipRes.json()
+            if (Array.isArray(payslips) && payslips.length > 0) {
+                // Sort by year/month desc to get latest
+                latestPayslip = payslips.sort((a: any, b: any) => (b.year - a.year) || (new Date(`${b.month} 1`).getMonth() - new Date(`${a.month} 1`).getMonth()))[0]
+            }
+        }
+
+        if (calendarRes.ok) {
+            todayEvents = await calendarRes.json()
+        }
+
     } catch (e) {
         console.error("Failed to fetch dashboard data")
     }
 
     const totalLeaves = leaveBalance.sick + leaveBalance.casual + leaveBalance.earned
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    const today = todayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-    const attendanceRate = "57.5" // Mock for visual alignment with image
-    const averageLate = "0.80" // Mock for visual alignment with image
-    const employeesPresent = "33" // Mock for visual alignment with image
+    const attendanceRate = Math.min(100, Math.round((summary.daysWorked / workingDaysSoFar) * 100)).toString()
+    const averageLate = "0.0" // Requires late tracking
+    const employeesPresent = "-" // Requires global stats access
+
+    // Format today's events for the vertical timeline
+    const timelineEvents = todayEvents.map((evt: any) => ({
+        time: "All Day", // Calendar events are mostly daily for now
+        title: evt.title,
+        location: evt.type === 'LEAVE' ? 'On Leave' : evt.type === 'TICKET' ? 'Assigned Ticket' : 'Remote',
+        color: evt.type === 'LEAVE' ? 'bg-rose-400' : 'bg-indigo-400'
+    }))
 
     return (
         <div className="flex flex-col min-h-screen bg-white dark:bg-slate-950">
@@ -161,48 +196,7 @@ export default async function DashboardPage() {
                             </div>
                         </Card>
 
-                        {/* 4. TODAY'S SCHEDULE (BOTTOM) */}
-                        <Card className="border border-slate-100 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 rounded-[2.5rem] p-8">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-600">
-                                    <Calendar className="w-6 h-6" />
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Today's Schedule</h3>
-                            </div>
-                            <div className="space-y-4">
-                                {[
-                                    { time: "8:30", title: "Strategic Meeting", location: "Meeting Room 1", status: "Online", color: "bg-emerald-400" },
-                                    { time: "10:00", title: "Client Consultation", location: "Acme Corp", status: "In A Meeting", color: "bg-amber-400" },
-                                    { time: "11:30", title: "Lunch Break", location: "", status: "On Leave", color: "bg-indigo-400" },
-                                    { time: "13:00", title: "Team Presentation", location: "Conference Room", status: "Offline", color: "bg-rose-400" },
-                                ].map((item, i) => (
-                                    <div key={i} className="flex items-center justify-between p-4 rounded-3xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                        <div className="flex items-center gap-6">
-                                            <div className="w-16">
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{item.time}</p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-2 h-2 rounded-full ${item.color}`} />
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-900 dark:text-white underline decoration-slate-200 underline-offset-4 group-hover:decoration-indigo-500 transition-colors">{item.title}</p>
-                                                    {item.location && <p className="text-[10px] text-slate-400 font-medium mt-0.5">{item.location}</p>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className={cn(
-                                            "px-4 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-2",
-                                            item.status === 'Online' ? "bg-emerald-50 text-emerald-600" :
-                                                item.status === 'In A Meeting' ? "bg-amber-50 text-amber-600" :
-                                                    item.status === 'On Leave' ? "bg-indigo-50 text-indigo-600" :
-                                                        "bg-rose-50 text-rose-600"
-                                        )}>
-                                            <span className={cn("w-2 h-2 rounded-full", item.color)} />
-                                            {item.status}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
+
                     </div>
 
                     {/* RIGHT COLUMN: 4 cols */}
@@ -234,13 +228,19 @@ export default async function DashboardPage() {
                                     <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Recent Payslip</h3>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">January 2026</p>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-xl font-bold text-slate-400">$</span>
-                                        <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">4,250.00</span>
+                                {latestPayslip ? (
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{latestPayslip.month} {latestPayslip.year}</p>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl font-bold text-slate-400">$</span>
+                                            <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{latestPayslip.amount.toLocaleString()}</span>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="space-y-1 py-4">
+                                        <p className="text-sm text-slate-500">No payslips available yet.</p>
+                                    </div>
+                                )}
 
                                 <Button asChild className="w-full h-12 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg transition-all active:scale-95">
                                     <Link href="/payslip" className="flex items-center justify-center gap-2">
@@ -260,13 +260,7 @@ export default async function DashboardPage() {
                             </div>
                             <div className="space-y-8 relative">
                                 <div className="absolute left-10 top-2 bottom-2 w-px bg-slate-100 dark:bg-slate-800" />
-                                {[
-                                    { time: "8:30", title: "Strategic Meeting", location: "Meeting Room 1", color: "bg-emerald-400" },
-                                    { time: "10:00", title: "Client Consultation", location: "Acme Corp", color: "bg-amber-400" },
-                                    { time: "11:30", title: "Lunch Break", location: "", color: "bg-indigo-400" },
-                                    { time: "13:00", title: "Team Presentation", location: "Conference Room", color: "bg-rose-400" },
-                                    { time: "2:30", title: "Code Review", location: "Web Team", color: "bg-pink-400" },
-                                ].map((item, i) => (
+                                {timelineEvents.length > 0 ? timelineEvents.map((item: any, i: number) => (
                                     <div key={i} className="flex gap-6 relative z-10">
                                         <div className="w-12 pt-1">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.time}</p>
@@ -279,7 +273,9 @@ export default async function DashboardPage() {
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                )) : (
+                                    <div className="text-center text-slate-400 italic text-sm">No events</div>
+                                )}
                             </div>
 
                         </Card>

@@ -26,6 +26,17 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+        // --- TOKEN VERSION CHECK (FOR LOGOUT OTHER DEVICES) ---
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: { tokenVersion: true, status: true } as any
+        }) as any;
+
+        if (!user || user.tokenVersion !== decoded.tokenVersion) {
+            return res.status(401).json({ error: 'Session expired or invalidated' });
+        }
+
         req.user = decoded;
 
         // --- LOCKDOWN CHECK ---
@@ -44,10 +55,9 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         }
 
         // Check if user is active
-        if (decoded.status !== UserStatus.ACTIVE && decoded.status !== UserStatus.PENDING) {
-            if (decoded.status !== UserStatus.ACTIVE) {
-                return res.status(403).json({ error: 'Account is not active' });
-            }
+        const status = user.status as string;
+        if (status !== 'ACTIVE' && status !== 'PENDING') {
+            return res.status(403).json({ error: 'Account is not active' });
         }
 
         next();

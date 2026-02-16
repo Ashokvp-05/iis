@@ -26,26 +26,28 @@ model User {
   roleId           String?         @map("role_id")
   resetToken       String?         @map("reset_token")
   resetTokenExpiry DateTime?       @map("reset_token_expiry")
+  azureId          String?         @unique @map("azure_id")
+  googleId         String?         @unique @map("google_id")
   twoFactorEnabled Boolean         @default(false) @map("two_factor_enabled")
   twoFactorSecret  String?         @map("two_factor_secret")
-  googleId         String?         @unique @map("google_id")
-  azureId          String?         @unique @map("azure_id")
+  approvalSteps    ApprovalStep[]
+  expenseClaims    ExpenseClaim[]
   givenKudos       Kudos[]         @relation("GivenKudos")
   receivedKudos    Kudos[]         @relation("ReceivedKudos")
   leaveBalance     LeaveBalance?
   leaveRequests    LeaveRequest[]
   notifications    Notification[]
+  payslips         Payslip[]
+  salaryAdvances   SalaryAdvance[]
   ticketComments   TicketComment[]
   assignedTickets  Ticket[]        @relation("AssignedTickets")
   tickets          Ticket[]        @relation("CreatedTickets")
   timeEntries      TimeEntry[]
   tags             UserTag[]
+  tokenVersion     Int             @default(1) @map("token_version")
   role             Role?           @relation(fields: [roleId], references: [id])
   wellnessChecks   WellnessCheck[]
-  payslips         Payslip[]
-  expenseClaims    ExpenseClaim[]
-  salaryAdvances   SalaryAdvance[]
-  approvalSteps    ApprovalStep[]
+  salaryConfig     SalaryConfig?
 
   @@index([email])
   @@index([status])
@@ -244,6 +246,128 @@ model TicketComment {
   @@map("ticket_comments")
 }
 
+model SalaryConfig {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  basicSalary     Decimal  @map("basic_salary") @db.Decimal(10, 2)
+  hra             Decimal  @default(0) @db.Decimal(10, 2)
+  da              Decimal  @default(0) @db.Decimal(10, 2)
+  bonus           Decimal  @default(0) @db.Decimal(10, 2)
+  pf              Decimal  @default(0) @db.Decimal(10, 2)
+  tax             Decimal  @default(0) @db.Decimal(10, 2)
+  otherAllowances Decimal  @default(0) @map("other_allowances") @db.Decimal(10, 2)
+  effectiveFrom   DateTime @default(now()) @map("effective_from")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("salary_configs")
+}
+
+model PayrollBatch {
+  id          String        @id @default(uuid())
+  month       String
+  year        Int
+  status      PayrollStatus @default(DRAFT)
+  createdBy   String        @map("created_by")
+  approvedBy  String?       @map("approved_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  releasedAt  DateTime?     @map("released_at")
+  payslips    Payslip[]
+
+  @@unique([month, year])
+  @@map("payroll_batches")
+}
+
+model Payslip {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  batchId         String?       @map("batch_id")
+  month           String
+  year            Int
+  payNumber       String?       @unique @map("pay_number")
+  
+  // Earnings
+  basicSalary     Decimal       @map("basic_salary") @db.Decimal(10, 2)
+  hra             Decimal       @default(0) @db.Decimal(10, 2)
+  da              Decimal       @default(0) @db.Decimal(10, 2)
+  bonus           Decimal       @default(0) @db.Decimal(10, 2)
+  otherAllowances Decimal       @default(0) @map("other_allowances") @db.Decimal(10, 2)
+  grossSalary     Decimal       @map("gross_salary") @db.Decimal(10, 2)
+
+  // Deductions
+  pfDeduction     Decimal       @default(0) @map("pf_deduction") @db.Decimal(10, 2)
+  taxDeduction    Decimal       @default(0) @map("tax_deduction") @db.Decimal(10, 2)
+  leaveDeduction  Decimal       @default(0) @map("leave_deduction") @db.Decimal(10, 2)
+  totalDeductions Decimal       @map("total_deductions") @db.Decimal(10, 2)
+  
+  netSalary       Decimal       @map("net_salary") @db.Decimal(10, 2)
+  
+  fileUrl         String?       @map("file_url")
+  status          PayrollStatus @default(DRAFT)
+  generatedAt     DateTime      @default(now()) @map("generated_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batch           PayrollBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@index([batchId])
+  @@map("payslips")
+}
+
+model ExpenseClaim {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  amount      Decimal        @db.Decimal(10, 2)
+  category    String
+  description String
+  receiptUrl  String?        @map("receipt_url")
+  status      ClaimStatus    @default(PENDING)
+  currentStep Int            @default(1) @map("current_step")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  approvals   ApprovalStep[]
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("expense_claims")
+}
+
+model SalaryAdvance {
+  id             String         @id @default(uuid())
+  userId         String         @map("user_id")
+  amount         Decimal        @db.Decimal(10, 2)
+  reason         String
+  repaymentTerms String?        @map("repayment_terms")
+  status         ClaimStatus    @default(PENDING)
+  currentStep    Int            @default(1) @map("current_step")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  approvals      ApprovalStep[]
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("salary_advances")
+}
+
+model ApprovalStep {
+  id           String        @id @default(uuid())
+  claimId      String        @map("claim_id")
+  claimType    ClaimType     @map("claim_type")
+  approverId   String        @map("approver_id")
+  status       ClaimStatus   @default(PENDING)
+  comments     String?
+  stepOrder    Int           @map("step_order")
+  processedAt  DateTime?     @map("processed_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  approver     User          @relation(fields: [approverId], references: [id])
+  expenseClaim    ExpenseClaim?  @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "expense_claim_fk")
+  salaryAdvance   SalaryAdvance? @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "salary_advance_fk")
+
+  @@map("approval_steps")
+}
+
 enum UserStatus {
   PENDING
   ACTIVE
@@ -314,79 +438,14 @@ enum TicketStatus {
   CLOSED
 }
 
-enum PayslipStatus {
+enum PayrollStatus {
+  DRAFT
   GENERATED
+  APPROVED
+  LOCKED
   SENT
   DOWNLOADED
-}
-
-model Payslip {
-  id        String        @id @default(uuid())
-  userId    String        @map("user_id")
-  month     String
-  year      Int
-  amount    Decimal       @db.Decimal(10, 2)
-  fileUrl   String        @map("file_url")
-  status    PayslipStatus @default(GENERATED)
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, month, year])
-  @@index([userId])
-  @@index([year, month])
-  @@map("payslips")
-}
-
-model ExpenseClaim {
-  id          String         @id @default(uuid())
-  userId      String         @map("user_id")
-  amount      Decimal        @db.Decimal(10, 2)
-  category    String
-  description String
-  receiptUrl  String?        @map("receipt_url")
-  status      ClaimStatus    @default(PENDING)
-  currentStep Int            @default(1) @map("current_step")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  approvals   ApprovalStep[]
-
-  @@map("expense_claims")
-}
-
-model SalaryAdvance {
-  id             String         @id @default(uuid())
-  userId         String         @map("user_id")
-  amount         Decimal        @db.Decimal(10, 2)
-  reason         String
-  repaymentTerms String?        @map("repayment_terms")
-  status         ClaimStatus    @default(PENDING)
-  currentStep    Int            @default(1) @map("current_step")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  approvals      ApprovalStep[]
-
-  @@map("salary_advances")
-}
-
-model ApprovalStep {
-  id              String         @id @default(uuid())
-  claimId         String         @map("claim_id")
-  claimType       ClaimType      @map("claim_type")
-  approverId      String         @map("approver_id")
-  status          ClaimStatus    @default(PENDING)
-  comments        String?
-  stepOrder       Int            @map("step_order")
-  processedAt     DateTime?      @map("processed_at")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  
-  approver        User           @relation(fields: [approverId], references: [id])
-  expenseClaim    ExpenseClaim?  @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "expense_claim_fk")
-  salaryAdvance   SalaryAdvance? @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "salary_advance_fk")
-
-  @@map("approval_steps")
+  RELEASED
 }
 
 enum ClaimStatus {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, X, User, Calendar, Clock, AlertCircle, DollarSign, FileText as FileIcon } from "lucide-react"
+import { Check, X, User, Calendar, AlertCircle, DollarSign, FileText as FileIcon } from "lucide-react"
 import { format } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,31 +18,32 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { PendingUser, PendingLeave, PendingPayslip } from "@/types/admin"
 
 interface AdminActionCenterProps {
     token: string
-    pendingUsers?: any[]
-    pendingLeaves?: any[]
-    pendingPayslips?: any[]
+    pendingUsers?: PendingUser[]
+    pendingLeaves?: PendingLeave[]
+    pendingPayslips?: PendingPayslip[]
     minimal?: boolean
 }
 
 export default function AdminActionCenter({ token, pendingUsers: initialUsers = [], pendingLeaves: initialLeaves = [], pendingPayslips: initialPayslips = [], minimal = false }: AdminActionCenterProps) {
     const router = useRouter()
     const { toast } = useToast()
-    const [users, setUsers] = useState(initialUsers)
-    const [leaves, setLeaves] = useState(initialLeaves)
-    const [payslips, setPayslips] = useState(initialPayslips)
+    const [users, setUsers] = useState(Array.isArray(initialUsers) ? initialUsers : [])
+    const [leaves, setLeaves] = useState(Array.isArray(initialLeaves) ? initialLeaves : [])
+    const [payslips, setPayslips] = useState(Array.isArray(initialPayslips) ? initialPayslips : [])
     const [loading, setLoading] = useState<string | null>(null)
 
     const [rejectionId, setRejectionId] = useState<string | null>(null)
     const [rejectionReason, setRejectionReason] = useState("")
     const [actionType, setActionType] = useState<'leave' | 'user'>('leave')
     const [mounted, setMounted] = useState(false)
+    const [bulkReleasing, setBulkReleasing] = useState(false)
 
     useEffect(() => {
         setMounted(true)
@@ -90,7 +91,7 @@ export default function AdminActionCenter({ token, pendingUsers: initialUsers = 
                     variant: "destructive",
                 })
             }
-        } catch (error) {
+        } catch {
             toast({
                 title: "Error",
                 description: "Something went wrong",
@@ -130,7 +131,7 @@ export default function AdminActionCenter({ token, pendingUsers: initialUsers = 
                     variant: "destructive",
                 })
             }
-        } catch (error) {
+        } catch {
             toast({
                 title: "Error",
                 description: "Something went wrong",
@@ -163,7 +164,7 @@ export default function AdminActionCenter({ token, pendingUsers: initialUsers = 
                     variant: "destructive",
                 })
             }
-        } catch (error) {
+        } catch {
             toast({
                 title: "Error",
                 description: "Something went wrong",
@@ -174,8 +175,43 @@ export default function AdminActionCenter({ token, pendingUsers: initialUsers = 
         }
     }
 
+    const handleBulkRelease = async () => {
+        if (payslips.length === 0) return
+        if (!confirm(`Are you sure you want to release all ${payslips.length} pending payslips?`)) return
+
+        setBulkReleasing(true)
+        try {
+            const ids = payslips.map(s => s.id)
+            const res = await fetch(`${API_BASE_URL}/payslips/bulk-release`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ ids })
+            })
+
+            if (res.ok) {
+                setPayslips([])
+                toast({
+                    title: "Success",
+                    description: `Successfully released ${ids.length} payslips`,
+                })
+                router.refresh()
+            }
+        } catch {
+            toast({
+                title: "Error",
+                description: "Bulk release failed",
+                variant: "destructive",
+            })
+        } finally {
+            setBulkReleasing(false)
+        }
+    }
+
     return (
-        <Card className={`col-span-1 lg:col-span-8 shadow-none border-0 ${minimal ? 'p-0' : 'pt-2'}`}>
+        <Card className={`w-full shadow-none border-0 ${minimal ? 'p-0' : 'pt-2'}`}>
             {!minimal && (
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -215,10 +251,16 @@ export default function AdminActionCenter({ token, pendingUsers: initialUsers = 
                                                 </div>
                                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                                     <Calendar className="w-3 h-3" />
-                                                    {mounted ? `${format(new Date(leave.startDate), 'PPP')} - ${format(new Date(leave.endDate), 'PPP')}` : 'Loading...'}
+                                                    {mounted ? (() => {
+                                                        try {
+                                                            return `${format(new Date(leave.startDate), 'PPP')} - ${format(new Date(leave.endDate), 'PPP')}`
+                                                        } catch {
+                                                            return "Invalid Date Range"
+                                                        }
+                                                    })() : 'Loading...'}
                                                 </div>
                                                 {leave.reason && (
-                                                    <div className="text-xs text-muted-foreground mt-1 italic">"{leave.reason}"</div>
+                                                    <div className="text-xs text-muted-foreground mt-1 italic">&ldquo;{leave.reason}&rdquo;</div>
                                                 )}
                                             </div>
                                         </div>
@@ -256,37 +298,49 @@ export default function AdminActionCenter({ token, pendingUsers: initialUsers = 
                                     No payslips pending release
                                 </div>
                             ) : (
-                                payslips.map((slip) => (
-                                    <div key={slip.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all group">
-                                        <div className="flex items-center gap-4 mb-3 sm:mb-0">
-                                            <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 font-bold">
-                                                <DollarSign className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-sm flex items-center gap-2">
-                                                    {slip.user?.name}
-                                                    <Badge variant="outline" className="text-[10px] font-normal uppercase bg-indigo-50 border-indigo-100 text-indigo-600">Generated</Badge>
-                                                </div>
-                                                <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-1 uppercase tracking-wider font-bold">
-                                                    <Calendar className="w-3 h-3" />
-                                                    {slip.month} {slip.year}
-                                                    <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                                    Amount: ${parseFloat(slip.amount).toLocaleString()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                                            <Button
-                                                size="sm"
-                                                className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 sm:flex-none h-8 text-[10px] font-black uppercase tracking-widest px-4"
-                                                onClick={() => handleRelease(slip.id)}
-                                                disabled={loading === slip.id}
-                                            >
-                                                {loading === slip.id ? "RELEASING..." : "RELEASE TO USER"}
-                                            </Button>
-                                        </div>
+                                <>
+                                    <div className="flex justify-end mb-4">
+                                        <Button
+                                            size="sm"
+                                            onClick={handleBulkRelease}
+                                            disabled={bulkReleasing}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] uppercase tracking-widest px-4"
+                                        >
+                                            {bulkReleasing ? "RELEASING ALL..." : "RELEASE ALL PENDING"}
+                                        </Button>
                                     </div>
-                                ))
+                                    {payslips.map((slip) => (
+                                        <div key={slip.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 mb-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all group">
+                                            <div className="flex items-center gap-4 mb-3 sm:mb-0">
+                                                <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 font-bold">
+                                                    <DollarSign className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-sm flex items-center gap-2">
+                                                        {slip.user?.name}
+                                                        <Badge variant="outline" className="text-[10px] font-normal uppercase bg-indigo-50 border-indigo-100 text-indigo-600">Generated</Badge>
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-1 uppercase tracking-wider font-bold">
+                                                        <Calendar className="w-3 h-3" />
+                                                        {slip.month} {slip.year}
+                                                        <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                                        Amount: ${Number(slip.amount).toLocaleString()}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 sm:flex-none h-8 text-[10px] font-black uppercase tracking-widest px-4"
+                                                    onClick={() => handleRelease(slip.id)}
+                                                    disabled={loading === slip.id}
+                                                >
+                                                    {loading === slip.id ? "RELEASING..." : "RELEASE TO USER"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </>
                             )}
                         </ScrollArea>
                     </TabsContent>

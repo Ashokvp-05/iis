@@ -15,19 +15,20 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     process.env.FRONTEND_URL,
+    process.env.NEXT_PUBLIC_FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+        if (
+            allowedOrigins.indexOf(origin) !== -1 ||
+            origin.endsWith('.vercel.app') ||
+            origin.endsWith('.onrender.com')
+        ) {
             callback(null, true);
         } else {
-            // For now, allow it but log (or restrict in strict production)
-            // callback(new Error('Not allowed by CORS'));
-            // Actually let's be strict but clear
             console.warn('Blocked by CORS:', origin);
             callback(new Error('Not allowed by CORS'));
         }
@@ -88,6 +89,7 @@ import calendarRoutes from './routes/calendar.routes';
 import kudosRoutes from './routes/kudos.routes';
 import aiRoutes from './routes/ai.routes';
 import payslipRoutes from './routes/payslip.routes';
+import payrollRoutes from './routes/payroll.routes';
 import workflowRoutes from './routes/workflow.routes';
 import { initCronJobs } from './services/cron.service';
 
@@ -109,6 +111,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/kudos', kudosRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/payslips', payslipRoutes);
+app.use('/api/payroll', payrollRoutes);
 app.use('/api/workflows', workflowRoutes);
 
 // 404 Handler - must be after all routes

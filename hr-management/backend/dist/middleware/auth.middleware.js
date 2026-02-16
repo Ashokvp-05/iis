@@ -14,7 +14,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireRole = exports.authorize = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -25,6 +24,14 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        // --- TOKEN VERSION CHECK (FOR LOGOUT OTHER DEVICES) ---
+        const user = yield db_1.default.user.findUnique({
+            where: { id: decoded.id },
+            select: { tokenVersion: true, status: true }
+        });
+        if (!user || user.tokenVersion !== decoded.tokenVersion) {
+            return res.status(401).json({ error: 'Session expired or invalidated' });
+        }
         req.user = decoded;
         // --- LOCKDOWN CHECK ---
         const lockdownConfig = yield db_1.default.systemConfig.findUnique({
@@ -39,10 +46,9 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             });
         }
         // Check if user is active
-        if (decoded.status !== client_1.UserStatus.ACTIVE && decoded.status !== client_1.UserStatus.PENDING) {
-            if (decoded.status !== client_1.UserStatus.ACTIVE) {
-                return res.status(403).json({ error: 'Account is not active' });
-            }
+        const status = user.status;
+        if (status !== 'ACTIVE' && status !== 'PENDING') {
+            return res.status(403).json({ error: 'Account is not active' });
         }
         next();
     }

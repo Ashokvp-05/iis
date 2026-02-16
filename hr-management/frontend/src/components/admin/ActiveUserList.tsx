@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { MapPin, Briefcase } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function ActiveUserList({ token }: { token: string }) {
     const [users, setUsers] = useState<any[]>([])
@@ -12,7 +13,7 @@ export default function ActiveUserList({ token }: { token: string }) {
     useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const res = await fetch("http://localhost:4000/api/time/active-users", {
+                const res = await fetch(`${API_BASE_URL}/time/active-users`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
                 if (res.ok) {

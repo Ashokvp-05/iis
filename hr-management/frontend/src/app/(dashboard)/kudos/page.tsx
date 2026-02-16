@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { KudosCard } from "@/components/kudos/KudosCard"
 import { GiveKudosModal } from "@/components/kudos/GiveKudosModal"
 import { Trophy, Star, Sparkles } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 export default async function KudosPage() {
     const session = await auth()
@@ -16,8 +17,8 @@ export default async function KudosPage() {
 
     try {
         const [kudosRes, usersRes] = await Promise.all([
-            fetch("http://localhost:4000/api/kudos", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
-            fetch("http://localhost:4000/api/users", { headers: { Authorization: `Bearer ${token}` } }) // Assuming exists, if not we might need to create it or similar
+            fetch(`${API_BASE_URL}/kudos`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+            fetch(`${API_BASE_URL}/users`, { headers: { Authorization: `Bearer ${token}` } })
         ])
 
         if (kudosRes.ok) kudosList = await kudosRes.json()

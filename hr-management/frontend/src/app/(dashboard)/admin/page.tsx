@@ -1,35 +1,19 @@
 import { auth } from "@/auth"
 import { API_BASE_URL } from "@/lib/config"
 import { redirect } from "next/navigation"
-import Link from "next/link"
 import {
     Activity,
     Users,
     FileText,
-    ArrowUpRight,
-    Briefcase,
-    Shield,
     Clock,
-    Building,
     Laptop,
-    AlertTriangle,
     Settings,
-    FileBarChart,
-    Plus,
-    Calendar,
     Zap,
-    Target,
-    Layers,
-    Database,
-    ShieldAlert,
-    Search,
-    MoreHorizontal
+    Shield,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { SystemHealthWidget } from "@/components/admin/widgets/SystemHealthWidget"
 import { ComplianceWidget } from "@/components/admin/widgets/ComplianceWidget"
@@ -41,6 +25,7 @@ import { SecurityAuditLogs } from "@/components/admin/SecurityAuditLogs"
 import { SystemSettingsCenter } from "@/components/admin/SystemSettingsCenter"
 import { TwoFactorSetup } from "@/components/auth/TwoFactorSetup"
 import { WorkflowPulse } from "@/components/admin/WorkflowPulse"
+import { PendingUser, PendingLeave, PendingPayslip } from "@/types/admin"
 
 export default async function AdminDashboardPage() {
     const session = await auth()
@@ -52,8 +37,7 @@ export default async function AdminDashboardPage() {
         redirect("/dashboard")
     }
 
-    const token = (session.user as any)?.accessToken || ""
-    const userName = session.user?.name || "Admin"
+    const token = (session.user as { accessToken?: string })?.accessToken || ""
 
     // Fetch Admin Data
     let overview = {
@@ -63,31 +47,35 @@ export default async function AdminDashboardPage() {
         officeCount: 0,
         attendanceRate: 0,
         pendingApprovals: 0,
-        alerts: [] as any[],
+        alerts: [] as Array<{
+            type: string;
+            message: string;
+            details?: string;
+        }>,
         recentActivity: [],
         remoteUsers: [],
         health: null,
         compliance: null
     }
-    let pendingUsers = []
-    let pendingLeaves = []
-    let pendingPayslips = []
+    let pendingUsers: PendingUser[] = []
+    let pendingLeaves: PendingLeave[] = []
+    let pendingPayslips: PendingPayslip[] = []
 
     try {
         const [overviewRes, pendingUsersRes, leavesRes, payslipsRes] = await Promise.all([
             fetch(`${API_BASE_URL}/admin/overview`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
             fetch(`${API_BASE_URL}/admin/pending-users`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
             fetch(`${API_BASE_URL}/leaves/all`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }),
-            fetch(`${API_BASE_URL}/payslips/all?status=GENERATED`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+            fetch(`${API_BASE_URL}/payslips?status=GENERATED`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
         ])
 
         if (overviewRes.ok) overview = await overviewRes.json()
         if (pendingUsersRes.ok) pendingUsers = await pendingUsersRes.json()
         if (leavesRes.ok) {
-            const allLeaves = await leavesRes.json() as any[]
+            const allLeaves = await leavesRes.json() as PendingLeave[]
             pendingLeaves = allLeaves.filter(l => l.status === 'PENDING')
         }
-        if (payslipsRes.ok) pendingPayslips = await payslipsRes.json()
+        if (payslipsRes.ok) pendingPayslips = await payslipsRes.json() as PendingPayslip[]
     } catch (e) {
         console.error("Failed to fetch admin dashboard data", e)
     }

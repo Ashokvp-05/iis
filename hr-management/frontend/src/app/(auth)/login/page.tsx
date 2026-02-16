@@ -61,8 +61,8 @@ export default function LoginPage() {
         try {
             const result = await signIn("credentials", {
                 redirect: false,
-                email: loginData.email,
-                password: loginData.password,
+                email: loginData.email.trim().toLowerCase(),
+                password: loginData.password.trim(),
             }) as any
 
             if (result?.error) {

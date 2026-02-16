@@ -6,6 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+    Dialog, DialogContent, DialogDescription,
+    DialogFooter, DialogHeader, DialogTitle
+} from "@/components/ui/dialog"
 import {
     Select,
     SelectContent,
@@ -15,9 +20,9 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, UploadCloud, Users, Calendar, DollarSign, FileText, Zap } from "lucide-react"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
+import { Loader2, UploadCloud, Users, Calendar, DollarSign, FileText, Zap, Search, X, Plus, CheckCircle2, Lock, Send } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
+import { cn } from "@/lib/utils"
 
 export default function PayrollPage() {
     const { data: session } = useSession()
@@ -25,6 +30,7 @@ export default function PayrollPage() {
     // Data state
     const [users, setUsers] = useState<any[]>([])
     const [payslips, setPayslips] = useState<any[]>([])
+    const [batches, setBatches] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
     // Form state
@@ -35,38 +41,52 @@ export default function PayrollPage() {
     const [file, setFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
     const [mounted, setMounted] = useState(false)
+    const [searchQuery, setSearchQuery] = useState("")
+    const [bulkReleasing, setBulkReleasing] = useState(false)
+
+    // Batch State
+    const [creatingBatch, setCreatingBatch] = useState(false)
+    const [showCreateBatchModal, setShowCreateBatchModal] = useState(false)
+    const [newBatch, setNewBatch] = useState({ month: "", year: new Date().getFullYear().toString() })
+    const [processingBatch, setProcessingBatch] = useState<string | null>(null)
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
-    useEffect(() => {
-        const init = async () => {
-            const token = (session?.user as any)?.accessToken
-            if (!token) return
+    const fetchAllData = async () => {
+        const token = (session?.user as any)?.accessToken
+        if (!token) return
 
-            try {
-                // Fetch Users
-                const usersRes = await fetch(`${API_URL}/users`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-                if (usersRes.ok) setUsers(await usersRes.json())
+        try {
+            // Fetch Users
+            fetch(`${API_BASE_URL}/users`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }).then(res => res.ok && res.json().then(setUsers))
 
-                // Fetch All Payslips
-                const payslipsRes = await fetch(`${API_URL}/payslips/all`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-                if (payslipsRes.ok) setPayslips(await payslipsRes.json())
-            } catch (error) {
-                console.error("Failed to load data", error)
-                toast.error("Failed to load payroll data")
-            } finally {
-                setLoading(false)
-            }
+            // Fetch All Payslips
+            fetch(`${API_BASE_URL}/payslips/all`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }).then(res => res.ok && res.json().then(setPayslips))
+
+            // Fetch Batches
+            fetch(`${API_BASE_URL}/payroll/batches`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }).then(res => res.ok && res.json().then(setBatches))
+
+        } catch (error) {
+            console.error("Failed to load data", error)
+            toast.error("Failed to load payroll data")
+        } finally {
+            setLoading(false)
         }
-        if (session) init()
+    }
+
+    useEffect(() => {
+        if (session) fetchAllData()
     }, [session])
 
+    // --- Individual Handlers ---
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0])
@@ -90,11 +110,9 @@ export default function PayrollPage() {
 
         try {
             const token = (session?.user as any)?.accessToken
-            const res = await fetch(`${API_URL}/payslips/upload`, {
+            const res = await fetch(`${API_BASE_URL}/payslips/upload`, {
                 method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`
-                },
+                headers: { Authorization: `Bearer ${token}` },
                 body: formData
             })
 
@@ -106,11 +124,8 @@ export default function PayrollPage() {
             const newPayslip = await res.json()
             setPayslips([newPayslip, ...payslips])
             toast.success("Payslip uploaded successfully")
-
-            // Reset form
             setAmount("")
             setFile(null)
-            // Keep user/date selections for batch uploads
         } catch (error: any) {
             toast.error(error.message || "Upload failed")
         } finally {
@@ -129,18 +144,13 @@ export default function PayrollPage() {
         setGenerating(true)
         try {
             const token = (session?.user as any)?.accessToken
-            const res = await fetch(`${API_URL}/payslips/generate`, {
+            const res = await fetch(`${API_BASE_URL}/payslips/generate`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    userId: selectedUser,
-                    month,
-                    year,
-                    amount
-                })
+                body: JSON.stringify({ userId: selectedUser, month, year, amount })
             })
 
             if (!res.ok) throw new Error("Generation failed")
@@ -159,7 +169,7 @@ export default function PayrollPage() {
     const handleRelease = async (id: string) => {
         try {
             const token = (session?.user as any)?.accessToken
-            const res = await fetch(`${API_URL}/payslips/${id}/release`, {
+            const res = await fetch(`${API_BASE_URL}/payslips/${id}/release`, {
                 method: "PATCH",
                 headers: { Authorization: `Bearer ${token}` }
             })
@@ -174,164 +184,388 @@ export default function PayrollPage() {
         }
     }
 
+    const handleBulkRelease = async () => {
+        const generatedSlips = payslips.filter(s => s.status === 'GENERATED')
+        if (generatedSlips.length === 0) {
+            toast.error("No generated payslips to release")
+            return
+        }
+        if (!confirm(`Are you sure you want to release all ${generatedSlips.length} generated payslips?`)) return
+
+        setBulkReleasing(true)
+        try {
+            const token = (session?.user as any)?.accessToken
+            const ids = generatedSlips.map(s => s.id)
+            const res = await fetch(`${API_BASE_URL}/payslips/bulk-release`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ ids })
+            })
+
+            if (res.ok) {
+                setPayslips(prev => prev.map(s => ids.includes(s.id) ? { ...s, status: 'SENT' } : s))
+                toast.success(`Successfully released ${ids.length} payslips`)
+            } else {
+                throw new Error("Bulk release failed")
+            }
+        } catch (error) {
+            toast.error("Failed to perform bulk release")
+        } finally {
+            setBulkReleasing(false)
+        }
+    }
+
+    // --- Batch Handlers ---
+    const handleCreateBatch = async () => {
+        if (!newBatch.month) {
+            toast.error("Select a month");
+            return;
+        }
+        setCreatingBatch(true)
+        const token = (session?.user as any)?.accessToken
+        try {
+            const res = await fetch(`${API_BASE_URL}/payroll/batches`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ ...newBatch, year: parseInt(newBatch.year) })
+            })
+            if (res.ok) {
+                const batch = await res.json()
+                setBatches([batch, ...batches])
+                toast.success("Payroll batch initialized")
+                setShowCreateBatchModal(false)
+            } else {
+                const err = await res.json();
+                toast.error(`Batch initialization failed: ${err.error}`)
+            }
+        } catch (e) {
+            toast.error("Engine Fault")
+        } finally {
+            setCreatingBatch(false)
+        }
+    }
+
+    const handleBatchAction = async (batchId: string, action: 'generate' | 'approve' | 'lock' | 'release') => {
+        setProcessingBatch(batchId)
+        const token = (session?.user as any)?.accessToken
+        try {
+            let url = '';
+            let method = '';
+            let body = {};
+
+            if (action === 'generate') {
+                url = `${API_BASE_URL}/payroll/batches/${batchId}/generate`;
+                method = 'POST';
+            } else {
+                url = `${API_BASE_URL}/payroll/batches/${batchId}/status`;
+                method = 'PUT';
+                // Map logical action to status enum if needed, assuming backend handles 'APPROVED', 'LOCKED', 'RELEASED'
+                const statusMap = {
+                    'approve': 'APPROVED',
+                    'lock': 'LOCKED',
+                    'release': 'RELEASED'
+                };
+                body = { status: statusMap[action] };
+            }
+
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(body)
+            })
+
+            if (res.ok) {
+                toast.success(`Batch ${action} successful`);
+                fetchAllData(); // Refresh data to show updates
+            } else {
+                const err = await res.json();
+                toast.error(`Action failed: ${err.error}`);
+            }
+        } catch (e) {
+            toast.error("Operation failed");
+        } finally {
+            setProcessingBatch(null);
+        }
+    }
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'DRAFT': return 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+            case 'APPROVED': return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
+            case 'LOCKED': return 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+            case 'RELEASED': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+            default: return 'bg-slate-500/10 text-slate-500'
+        }
+    }
+
+    const filteredPayslips = payslips.filter(s =>
+        s.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.month.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+
     if (loading) return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>
 
     return (
         <div className="space-y-8 container max-w-6xl py-10 animate-in fade-in duration-500">
             <div>
                 <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Payroll Management</h1>
-                <p className="text-slate-500 mt-2">Upload and manage employee payslips securely.</p>
+                <p className="text-slate-500 mt-2">Enterprise-grade payroll operations and oversight.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Upload Form */}
-                <Card className="lg:col-span-1 border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 h-fit sticky top-24">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <UploadCloud className="w-5 h-5 text-indigo-600" />
-                            Upload Payslip
-                        </CardTitle>
-                        <CardDescription>Upload PDF payslip for an employee.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleUpload} className="space-y-4">
+            <Tabs defaultValue="batches" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-14 rounded-[1.5rem] bg-slate-100 dark:bg-slate-900 p-1 mb-8">
+                    <TabsTrigger value="batches" className="rounded-2xl h-12 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg">Batch Operations</TabsTrigger>
+                    <TabsTrigger value="individual" className="rounded-2xl h-12 font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg">Individual Management</TabsTrigger>
+                </TabsList>
+
+                {/* --- BATCH OPERATIONS TAB --- */}
+                <TabsContent value="batches" className="space-y-6">
+                    <div className="flex justify-between items-center bg-white dark:bg-slate-950 p-6 rounded-[2rem] shadow-xl border border-indigo-50/50 dark:border-indigo-900/20">
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Active Payroll Cycles</h3>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Manage monthly disbursement cycles</p>
+                        </div>
+                        <Button
+                            onClick={() => setShowCreateBatchModal(true)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-6 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20"
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Initialize Batch
+                        </Button>
+                    </div>
+
+                    <div className="grid gap-6">
+                        {batches.map((batch) => (
+                            <Card key={batch.id} className="border-none bg-white dark:bg-slate-900 shadow-lg rounded-[2rem] overflow-hidden">
+                                <CardContent className="p-0">
+                                    <div className="flex flex-col md:flex-row items-center justify-between p-6 gap-6">
+                                        <div className="flex items-center gap-6">
+                                            <div className="h-16 w-16 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center">
+                                                <Calendar className="w-6 h-6 text-slate-400" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-3">
+                                                    <h3 className="text-xl font-black uppercase tracking-tight">{batch.month} {batch.year}</h3>
+                                                    <Badge variant="outline" className={cn("rounded-lg px-2 py-0.5 text-[8px] font-black uppercase tracking-widest", getStatusColor(batch.status))}>
+                                                        {batch.status}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex items-center gap-4 mt-2">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                                        <Users className="w-3 h-3" /> {batch.payslipCount || 0} Employees
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                                        <DollarSign className="w-3 h-3" /> Pipeline
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            {/* Action Buttons based on Status */}
+                                            {batch.status === 'DRAFT' && (
+                                                <Button
+                                                    onClick={() => handleBatchAction(batch.id, 'generate')}
+                                                    disabled={processingBatch === batch.id}
+                                                    className="h-10 px-6 rounded-xl bg-slate-900 text-white font-black uppercase text-[9px] tracking-widest shadow-lg hover:bg-slate-800"
+                                                >
+                                                    {processingBatch === batch.id ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Zap className="w-3 h-3 mr-2 text-yellow-400" />}
+                                                    Run Calculation
+                                                </Button>
+                                            )}
+                                            {batch.status === 'DRAFT' && (
+                                                <Button
+                                                    onClick={() => handleBatchAction(batch.id, 'approve')}
+                                                    disabled={processingBatch === batch.id}
+                                                    variant="outline"
+                                                    className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                                >
+                                                    <CheckCircle2 className="w-3 h-3 mr-2" /> Approve
+                                                </Button>
+                                            )}
+                                            {batch.status === 'APPROVED' && (
+                                                <Button
+                                                    onClick={() => handleBatchAction(batch.id, 'lock')}
+                                                    disabled={processingBatch === batch.id}
+                                                    className="h-10 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[9px] tracking-widest shadow-lg shadow-amber-500/20"
+                                                >
+                                                    <Lock className="w-3 h-3 mr-2" /> Lock & Finalize
+                                                </Button>
+                                            )}
+                                            {batch.status === 'LOCKED' && (
+                                                <Button
+                                                    onClick={() => handleBatchAction(batch.id, 'release')}
+                                                    disabled={processingBatch === batch.id}
+                                                    className="h-10 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-[9px] tracking-widest shadow-lg shadow-emerald-500/20"
+                                                >
+                                                    <Send className="w-3 h-3 mr-2" /> Release Payments
+                                                </Button>
+                                            )}
+                                            {batch.status === 'RELEASED' && (
+                                                <Button disabled variant="ghost" className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest text-emerald-600 opacity-100">
+                                                    <CheckCircle2 className="w-4 h-4 mr-2" /> Disbursed
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                        {batches.length === 0 && <div className="text-center py-10 text-slate-400">No active batches initialized.</div>}
+                    </div>
+                </TabsContent>
+
+                {/* --- INDIVIDUAL MANAGEMENT TAB (Existing Content) --- */}
+                <TabsContent value="individual">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Copy the existing Upload Form and List here */}
+                        <Card className="lg:col-span-1 border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 h-fit sticky top-24">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <UploadCloud className="w-5 h-5 text-indigo-600" />
+                                    Upload Payslip
+                                </CardTitle>
+                                <CardDescription>Upload PDF payslip for an employee.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form onSubmit={handleUpload} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Employee</Label>
+                                        <Select onValueChange={setSelectedUser} value={selectedUser}>
+                                            <SelectTrigger><SelectValue placeholder="Select Employee" /></SelectTrigger>
+                                            <SelectContent>
+                                                {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name} ({user.email})</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Month</Label>
+                                            <Select onValueChange={setMonth} value={month}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m) => (
+                                                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Year</Label>
+                                            <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Net Amount</Label>
+                                        <Input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Payslip PDF (Optional)</Label>
+                                        <Input type="file" accept=".pdf" onChange={handleFileChange} />
+                                    </div>
+                                    <div className="pt-4 space-y-3">
+                                        <Button type="submit" className="w-full bg-slate-900 text-white font-black uppercase tracking-widest h-12 rounded-xl" disabled={uploading || !file}>
+                                            {uploading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <UploadCloud className="mr-2 h-4 w-4" />} Manual Upload
+                                        </Button>
+                                        <div className="relative flex justify-center text-[10px] uppercase font-black text-slate-400 bg-white dark:bg-slate-900 px-2 tracking-widest">or use intelligence</div>
+                                        <Button type="button" onClick={handleGenerate} className="w-full bg-white text-indigo-600 border-2 border-indigo-100 font-black uppercase tracking-widest h-12 rounded-xl" disabled={generating}>
+                                            {generating ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Zap className="mr-2 h-4 w-4" />} Generate & Save
+                                        </Button>
+                                    </div>
+                                </form>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="lg:col-span-2 border-indigo-50/50 dark:border-indigo-900/20 shadow-2xl bg-white dark:bg-slate-950 rounded-3xl overflow-hidden">
+                            <CardHeader className="bg-slate-50/50 dark:bg-black/20 border-b border-border/50 flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-xl font-black tracking-tight">Financial Stream Log</CardTitle>
+                                    <CardDescription>History of all payroll transactions</CardDescription>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                                        <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-8 pl-9 text-xs w-48" />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="divide-y divide-slate-100">
+                                    {filteredPayslips.map((slip) => (
+                                        <div key={slip.id} className="flex items-center justify-between p-6">
+                                            <div className="flex items-center gap-5">
+                                                <div className="h-12 w-12 bg-indigo-50 rounded-2xl flex items-center justify-center"><FileText className="h-6 w-6 text-indigo-600" /></div>
+                                                <div>
+                                                    <p className="font-black text-slate-900">{slip.user?.name}</p>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{slip.month} {slip.year} • {slip.amount}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Badge variant="outline">{slip.status}</Badge>
+                                                {slip.status === 'GENERATED' && <Button size="sm" variant="outline" onClick={() => handleRelease(slip.id)}>Release</Button>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+            </Tabs>
+
+            {/* Initialize Batch Dialog */}
+            <Dialog open={showCreateBatchModal} onOpenChange={setShowCreateBatchModal}>
+                <DialogContent className="max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] border-none p-10 dark:text-white">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-black">Initialize Batch</DialogTitle>
+                        <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Quantum Payroll Infrastructure</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 pt-6">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Employee</Label>
-                                <Select onValueChange={setSelectedUser} value={selectedUser}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Employee" />
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</label>
+                                <Select onValueChange={(v) => setNewBatch({ ...newBatch, month: v })}>
+                                    <SelectTrigger className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold">
+                                        <SelectValue placeholder="Month" />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                        {users.map((user) => (
-                                            <SelectItem key={user.id} value={user.id}>
-                                                {user.name} ({user.email})
-                                            </SelectItem>
+                                    <SelectContent className="rounded-2xl border-slate-100 dark:border-white/5">
+                                        {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
+                                            <SelectItem key={m} value={m} className="font-bold text-xs">{m}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Month</Label>
-                                    <Select onValueChange={setMonth} value={month}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m) => (
-                                                <SelectItem key={m} value={m}>{m}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Year</Label>
-                                    <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
-                                </div>
-                            </div>
-
                             <div className="space-y-2">
-                                <Label>Net Amount</Label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                    <Input
-                                        type="number"
-                                        placeholder="0.00"
-                                        className="pl-9"
-                                        value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
-                                    />
-                                </div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Year</label>
+                                <Input
+                                    type="number"
+                                    value={newBatch.year}
+                                    onChange={(e) => setNewBatch({ ...newBatch, year: e.target.value })}
+                                    className="w-full h-12 px-4 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold focus:outline-none focus:ring-2 ring-indigo-500"
+                                />
                             </div>
-
-                            <div className="space-y-2">
-                                <Label>Payslip PDF (Optional for Template)</Label>
-                                <Input type="file" accept=".pdf" onChange={handleFileChange} className="cursor-pointer" />
-                            </div>
-
-                            <div className="pt-4 space-y-3">
-                                <Button type="submit" className="w-full bg-slate-900 border-indigo-500/30 hover:bg-slate-800 text-white font-black uppercase tracking-widest h-12 rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-500/10" disabled={uploading || !file}>
-                                    {uploading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <UploadCloud className="mr-2 h-4 w-4 text-indigo-400" />}
-                                    Manual Upload
-                                </Button>
-
-                                <div className="relative py-2">
-                                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100 dark:border-slate-800"></span></div>
-                                    <div className="relative flex justify-center text-[10px] uppercase font-black text-slate-400 bg-white dark:bg-slate-900 px-2 tracking-widest">or use intelligence</div>
-                                </div>
-
-                                <Button
-                                    type="button"
-                                    onClick={handleGenerate}
-                                    className="w-full bg-white dark:bg-slate-950 border-2 border-indigo-100 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 text-indigo-600 font-black uppercase tracking-widest h-12 rounded-xl transition-all active:scale-95 group"
-                                    disabled={generating}
-                                >
-                                    {generating ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Zap className="mr-2 h-4 w-4 group-hover:animate-pulse" />}
-                                    Generate & Save
-                                </Button>
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
-
-                {/* List */}
-                <Card className="lg:col-span-2 border-indigo-50/50 dark:border-indigo-900/20 shadow-2xl bg-white dark:bg-slate-950 rounded-3xl overflow-hidden">
-                    <CardHeader className="bg-slate-50/50 dark:bg-black/20 border-b border-border/50">
-                        <CardTitle className="text-xl font-black tracking-tight">Financial Stream Log</CardTitle>
-                        <CardDescription className="text-xs font-bold text-slate-400 uppercase tracking-widest">History of all payroll transactions</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {payslips.map((slip) => (
-                                <div key={slip.id} className="flex items-center justify-between p-6 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/5 transition-all group">
-                                    <div className="flex items-center gap-5">
-                                        <div className="h-12 w-12 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                                            <FileText className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                                        </div>
-                                        <div>
-                                            <p className="font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                                {slip.user?.name || "Unknown User"}
-                                                {slip.fileUrl.includes('System_Generated') && (
-                                                    <Badge variant="outline" className="text-[8px] font-black uppercase border-indigo-200 text-indigo-500 bg-indigo-50">Template</Badge>
-                                                )}
-                                            </p>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mt-1">
-                                                <Calendar className="w-3 h-3" /> {slip.month} {slip.year}
-                                                <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                                <DollarSign className="w-3 h-3" /> {mounted ? `$ ${parseFloat(slip.amount).toLocaleString()}` : slip.amount}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="text-right">
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${slip.status === 'GENERATED' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-                                                slip.status === 'SENT' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
-                                                    'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                                }`}>
-                                                {slip.status}
-                                            </span>
-                                        </div>
-                                        {slip.status === 'GENERATED' && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 px-2 text-[10px] font-black uppercase tracking-widest border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                                                onClick={() => handleRelease(slip.id)}
-                                            >
-                                                Release
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            {payslips.length === 0 && (
-                                <div className="text-center py-10 text-slate-500">No payslips found.</div>
-                            )}
                         </div>
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                    <DialogFooter className="pt-10">
+                        <Button
+                            onClick={handleCreateBatch}
+                            disabled={creatingBatch}
+                            className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20"
+                        >
+                            {creatingBatch ? "Connecting..." : "Confirm & Initialize"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -1,11 +1,12 @@
 import prisma from '../config/db';
 import path from 'path';
 import fs from 'fs';
-import { PayslipStatus } from '@prisma/client';
+import { PayrollStatus } from '@prisma/client';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { createNotification } from './notification.service';
 import { logAction } from './audit.service';
+import { supabase, STORAGE_BUCKET } from '../config/supabase';
 
 const UPLOAD_ROOT = path.join(process.cwd(), 'uploads/payslips');
 
@@ -123,41 +124,64 @@ export const uploadPayslip = async (
     fileBuffer: Buffer,
     filename: string
 ) => {
-    // Generate secure path: uploads/payslips/YYYY/MONTH/userId_timestamp.pdf
     const safeFilename = `${userId}_${Date.now()}.pdf`;
-    const yearDir = path.join(UPLOAD_ROOT, year.toString());
-    const monthDir = path.join(yearDir, month);
+    const storagePath = `${year}/${month}/${safeFilename}`;
+    let fileUrl = '';
 
-    if (!fs.existsSync(monthDir)) {
-        fs.mkdirSync(monthDir, { recursive: true });
+    // 1. Try Supabase Upload first
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+        try {
+            const { data, error } = await supabase.storage
+                .from(STORAGE_BUCKET)
+                .upload(storagePath, fileBuffer, {
+                    contentType: 'application/pdf',
+                    upsert: true
+                });
+
+            if (error) throw error;
+            fileUrl = `supabase://${storagePath}`; // Use a prefix to distinguish
+        } catch (e: any) {
+            console.error("Supabase Upload Failed, falling back to local:", e.message);
+        }
     }
 
-    const filePath = path.join(monthDir, safeFilename);
-    const relativePath = path.relative(process.cwd(), filePath); // Store relative path for portability
+    // 2. Local Fallback (or if Supabase failed)
+    if (!fileUrl) {
+        const yearDir = path.join(UPLOAD_ROOT, year.toString());
+        const monthDir = path.join(yearDir, month);
 
-    // Write file securely
-    fs.writeFileSync(filePath, fileBuffer);
+        if (!fs.existsSync(monthDir)) {
+            fs.mkdirSync(monthDir, { recursive: true });
+        }
 
-    // Create DB entry
-    // Check if exists first to update or create
+        const filePath = path.join(monthDir, safeFilename);
+        fs.writeFileSync(filePath, fileBuffer);
+        fileUrl = path.relative(process.cwd(), filePath);
+    }
+
+    // 3. Database Entry
     const existing = await prisma.payslip.findFirst({
         where: { userId, month, year }
     });
 
     if (existing) {
-        // Update existing record
-        // Delete old file if needed (optional hygiene)
-        try {
-            const oldPath = path.join(process.cwd(), existing.fileUrl);
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-        } catch (e) { console.warn("Failed to delete old file", e); }
+        // Clean up old file if local
+        if (existing.fileUrl && !existing.fileUrl.startsWith('supabase://')) {
+            try {
+                const oldPath = path.join(process.cwd(), existing.fileUrl);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            } catch (e) { }
+        }
 
         return prisma.payslip.update({
             where: { id: existing.id },
             data: {
-                fileUrl: relativePath,
-                amount,
-                status: 'GENERATED',
+                fileUrl,
+                basicSalary: amount,
+                netSalary: amount,
+                grossSalary: amount,
+                totalDeductions: 0,
+                status: PayrollStatus.GENERATED,
                 updatedAt: new Date()
             }
         });
@@ -168,9 +192,12 @@ export const uploadPayslip = async (
             userId,
             month,
             year,
-            amount,
-            fileUrl: relativePath,
-            status: 'GENERATED'
+            basicSalary: amount,
+            netSalary: amount,
+            grossSalary: amount,
+            totalDeductions: 0,
+            fileUrl,
+            status: PayrollStatus.GENERATED
         }
     });
 };
@@ -183,35 +210,48 @@ export const getPayslipFile = async (payslipId: string, requesterId: string, rol
 
     if (!payslip) throw new Error("Payslip not found");
 
-    // RBAC: Verify ownership or admin privileges
     if (roleName !== 'ADMIN' && roleName !== 'MANAGER' && payslip.userId !== requesterId) {
         throw new Error("Unauthorized access to this payslip");
     }
 
-    const absolutePath = path.resolve(process.cwd(), payslip.fileUrl);
+    let url = '';
+    let absolutePath = '';
 
-    if (!fs.existsSync(absolutePath)) {
-        throw new Error("Payslip file not found on server");
+    if (payslip.fileUrl && payslip.fileUrl.startsWith('supabase://')) {
+        const storagePath = payslip.fileUrl.replace('supabase://', '');
+        const { data, error } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .createSignedUrl(storagePath, 60); // 60 seconds expiry
+
+        if (error) throw new Error(`Supabase Error: ${error.message}`);
+        url = data.signedUrl;
+    } else if (payslip.fileUrl) {
+        absolutePath = path.resolve(process.cwd(), payslip.fileUrl);
+        if (!fs.existsSync(absolutePath)) {
+            throw new Error("Payslip file not found on server");
+        }
+    } else {
+        throw new Error("Payslip file URL is missing");
     }
 
-    // If owner downloads, update status to DOWNLOADED
-    if (payslip.userId === requesterId && payslip.status === 'SENT') {
+    if (payslip.userId === requesterId && payslip.status === PayrollStatus.SENT) {
         await prisma.payslip.update({
             where: { id: payslipId },
-            data: { status: 'DOWNLOADED' }
+            data: { status: PayrollStatus.DOWNLOADED }
         });
     }
 
     return {
         path: absolutePath,
-        filename: `${payslip.month}_${payslip.year} _Payslip.pdf`
+        url,
+        filename: `${payslip.month}_${payslip.year}_Payslip.pdf`
     };
 };
 
 export const releasePayslip = async (id: string) => {
     const slip = await prisma.payslip.update({
         where: { id },
-        data: { status: 'SENT' }
+        data: { status: PayrollStatus.SENT }
     });
 
     // Notify user
@@ -233,7 +273,7 @@ export const getMyPayslips = async (userId: string) => {
     return prisma.payslip.findMany({
         where: {
             userId,
-            status: { in: ['SENT', 'DOWNLOADED'] }
+            status: { in: [PayrollStatus.SENT, PayrollStatus.DOWNLOADED] }
         },
         orderBy: [
             { year: 'desc' },
@@ -270,13 +310,13 @@ export const getAllPayslips = async (year?: number, month?: string, status?: str
 
 export const bulkReleasePayslips = async (ids: string[]) => {
     const results = await prisma.payslip.updateMany({
-        where: { id: { in: ids }, status: 'GENERATED' },
-        data: { status: 'SENT' }
+        where: { id: { in: ids }, status: PayrollStatus.GENERATED },
+        data: { status: PayrollStatus.SENT }
     });
 
     // Create notifications for all updated payslips
     const updatedPayslips = await prisma.payslip.findMany({
-        where: { id: { in: ids }, status: 'SENT' },
+        where: { id: { in: ids }, status: PayrollStatus.SENT },
         select: { userId: true, month: true, year: true }
     });
 
@@ -302,7 +342,7 @@ export const deletePayslip = async (id: string) => {
     });
 };
 
-export const updatePayslip = async (id: string, data: { month?: string, year?: number, amount?: number, status?: PayslipStatus }) => {
+export const updatePayslip = async (id: string, data: { month?: string, year?: number, amount?: number, status?: PayrollStatus }) => {
     return prisma.payslip.update({
         where: { id },
         data

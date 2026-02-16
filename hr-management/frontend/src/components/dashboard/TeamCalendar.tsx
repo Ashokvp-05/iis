@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { format, startOfMonth, endOfMonth, isSameDay } from "date-fns"
+import { format, startOfMonth, endOfMonth } from "date-fns"
 import { Calendar as CalendarIcon, Info, Users, PartyPopper, AlertCircle } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 interface CalendarEvent {
     id: string
@@ -23,31 +24,33 @@ export default function TeamCalendar() {
     const token = (session?.user as any)?.accessToken
 
     const [date, setDate] = useState<Date | undefined>(new Date())
+    const [month, setMonth] = useState<Date>(new Date())
     const [events, setEvents] = useState<CalendarEvent[]>([])
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        if (token) fetchCalendarData()
-    }, [token])
-
-    const fetchCalendarData = async () => {
+    const fetchCalendarData = useCallback(async () => {
+        if (!token) return
         try {
-            const start = format(startOfMonth(new Date()), 'yyyy-MM-dd')
-            const end = format(endOfMonth(new Date()), 'yyyy-MM-dd')
+            const start = format(startOfMonth(month), 'yyyy-MM-dd')
+            const end = format(endOfMonth(month), 'yyyy-MM-dd')
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendar?start=${start}&end=${end}`, {
+            const res = await fetch(`${API_BASE_URL}/calendar?start=${start}&end=${end}`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {
                 const data = await res.json()
                 setEvents(data)
             }
-        } catch (error) {
+        } catch {
             console.error("Failed to fetch calendar data")
         } finally {
             setLoading(false)
         }
-    }
+    }, [token, month])
+
+    useEffect(() => {
+        fetchCalendarData()
+    }, [fetchCalendarData])
 
     const selectedDayEvents = events.filter(event => {
         if (!date) return false
@@ -109,6 +112,8 @@ export default function TeamCalendar() {
                             mode="single"
                             selected={date}
                             onSelect={setDate}
+                            month={month}
+                            onMonthChange={setMonth}
                             className="w-full"
                         />
                     </div>

@@ -36,12 +36,12 @@ import { useToast } from "@/components/ui/use-toast"
 import { API_BASE_URL } from "@/lib/config"
 
 const leaveSchema = z.object({
-    type: z.enum(["CASUAL", "MEDICAL", "OTHER", "EARNED", "UNPAID"]),
-    startDate: z.date(),
-    endDate: z.date(),
-    reason: z.string().min(5, "Reason must be at least 5 characters"),
+    type: z.string().min(1, "Select leave type"),
+    startDate: z.date({ message: "A start date is required." }),
+    endDate: z.date({ message: "An end date is required." }),
+    reason: z.string().min(10, "Reason must be at least 10 characters.").max(500),
 }).refine((data) => data.endDate >= data.startDate, {
-    message: "End date must be after start date",
+    message: "End date cannot be before start date",
     path: ["endDate"],
 })
 
@@ -164,8 +164,8 @@ export default function LeaveRequestForm({ token, onSuccess }: { token: string, 
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <FormControl>
-                                            <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                            <Button variant="outline" className={cn("w-full pl-3 justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                {field.value ? format(field.value, "PP") : <span>Pick a date</span>}
                                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                             </Button>
                                         </FormControl>
@@ -194,8 +194,8 @@ export default function LeaveRequestForm({ token, onSuccess }: { token: string, 
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <FormControl>
-                                            <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                            <Button variant="outline" className={cn("w-full pl-3 justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                {field.value ? format(field.value, "PP") : <span>Pick a date</span>}
                                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                             </Button>
                                         </FormControl>

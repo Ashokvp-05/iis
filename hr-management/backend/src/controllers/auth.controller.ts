@@ -89,3 +89,13 @@ export const disable2FA = async (req: Request, res: Response) => {
         res.status(400).json({ error: error.message });
     }
 };
+
+export const logoutOthers = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).user.id;
+        await authService.logoutOthers(userId);
+        res.status(200).json({ message: 'All other devices logged out successfully. Future requests from those devices will require a fresh login.' });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+}

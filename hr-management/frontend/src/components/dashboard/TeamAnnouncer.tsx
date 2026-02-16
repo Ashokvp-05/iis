@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Megaphone, Loader2 } from "lucide-react"
+import { useState, useCallback } from "react"
+import { Megaphone, Loader2, Zap, AlertTriangle, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { API_BASE_URL } from "@/lib/config"
+import { cn } from "@/lib/utils"
 
 interface TeamAnnouncerProps {
     token: string;
@@ -17,7 +18,7 @@ export function TeamAnnouncer({ token, activeCount }: TeamAnnouncerProps) {
     const [priority, setPriority] = useState<"NORMAL" | "URGENT">("NORMAL")
     const [loading, setLoading] = useState(false)
 
-    const handlePost = async () => {
+    const handlePost = useCallback(async () => {
         if (!content.trim()) {
             toast.error("Announcement content cannot be empty")
             return
@@ -41,65 +42,82 @@ export function TeamAnnouncer({ token, activeCount }: TeamAnnouncerProps) {
 
             if (!res.ok) throw new Error("Failed to post announcement")
 
-            toast.success("Announcement posted to the team!")
+            toast.success("Broadcast successful. Team nodes notified.", {
+                icon: <Zap className="w-4 h-4 text-emerald-500" />
+            })
             setContent("")
         } catch (error) {
             console.error(error)
-            toast.error("Failed to post announcement")
+            toast.error("Telemetry failed. Broadcast not transmitted.")
         } finally {
             setLoading(false)
         }
-    }
+    }, [content, priority, token])
 
     return (
-        <div className="space-y-4 md:border-l md:pl-8 border-slate-200 dark:border-slate-800">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                <Megaphone className="w-4 h-4" /> Team Announcements
+        <div className="space-y-6 md:border-l md:pl-8 border-slate-100 dark:border-white/5 h-full flex flex-col">
+            <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3">
+                <Megaphone className="w-4 h-4 text-indigo-500" /> Neural Broadcast
             </h4>
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all shadow-sm">
+
+            <div className="flex-1 min-h-[160px] bg-slate-50/50 dark:bg-black/20 rounded-[2rem] p-6 border border-slate-200/50 dark:border-white/5 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/30 transition-all shadow-inner flex flex-col">
                 <textarea
-                    className="w-full bg-transparent border-0 text-sm font-medium placeholder:text-slate-400 focus:ring-0 resize-none h-24 leading-relaxed"
-                    placeholder="Type an urgent update for the team (e.g., 'Server maintenance at 5 PM')..."
+                    className="w-full bg-transparent border-0 text-xs font-bold uppercase tracking-wider placeholder:text-slate-400 placeholder:opacity-50 focus:ring-0 resize-none flex-1 leading-relaxed dark:text-slate-200"
+                    placeholder="Input strategic directive for the collective..."
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     disabled={loading}
                 />
-                <div className="flex flex-wrap items-center justify-between mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                            variant="outline"
-                            className={`text-xs cursor-pointer transition-colors ${priority === "NORMAL" ? "bg-indigo-600 text-white border-indigo-500" : "bg-white dark:bg-slate-900 hover:bg-indigo-50"}`}
+
+                <div className="flex flex-wrap items-center justify-between mt-4 pt-4 border-t border-slate-200/50 dark:border-white/5 gap-4">
+                    <div className="flex items-center gap-2">
+                        <button
                             onClick={() => setPriority("NORMAL")}
+                            className={cn(
+                                "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border",
+                                priority === "NORMAL"
+                                    ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/20"
+                                    : "bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-white/5 hover:border-indigo-500/30"
+                            )}
                         >
-                            Normal
-                        </Badge>
-                        <Badge
-                            variant="outline"
-                            className={`text-xs cursor-pointer transition-colors ${priority === "URGENT" ? "bg-amber-500 text-white border-amber-400" : "border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"}`}
+                            Standard
+                        </button>
+                        <button
                             onClick={() => setPriority("URGENT")}
+                            className={cn(
+                                "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex items-center gap-2",
+                                priority === "URGENT"
+                                    ? "bg-rose-500 text-white border-rose-400 shadow-lg shadow-rose-500/20"
+                                    : "bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-white/5 hover:border-rose-500/30"
+                            )}
                         >
-                            Urgent
-                        </Badge>
+                            <AlertTriangle className={cn("w-3 h-3", priority === "URGENT" ? "animate-pulse" : "text-slate-300")} /> Urgent
+                        </button>
                     </div>
+
                     <Button
                         size="sm"
-                        className="h-9 text-xs bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 font-bold px-5 shadow-lg rounded-xl"
+                        className="h-10 text-[9px] bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest px-6 shadow-xl shadow-indigo-500/20 rounded-xl border-0 active:scale-95 transition-all"
                         onClick={handlePost}
                         disabled={loading || !content.trim()}
                     >
                         {loading ? (
                             <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
                         ) : (
-                            <Megaphone className="w-3.5 h-3.5 mr-2" />
+                            <Send className="w-3.5 h-3.5 mr-2" />
                         )}
-                        Post
+                        Transmit
                     </Button>
                 </div>
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                Live broadcast to {activeCount} active members
-            </p>
+
+            <div className="flex items-center justify-end gap-3 opacity-60">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Targeting {activeCount} identified nodes</span>
+                <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+            </div>
         </div>
     )
 }

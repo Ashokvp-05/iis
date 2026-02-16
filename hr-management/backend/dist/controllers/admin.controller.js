@@ -156,11 +156,9 @@ const getAuditLogs = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             where: { id: { in: adminIds } },
             select: { id: true, name: true, designation: true, department: true }
         });
-        const adminMap = admins.reduce((acc, admin) => {
-            acc[admin.id] = admin;
-            return acc;
-        }, {});
-        const enrichedLogs = logs.map(log => (Object.assign(Object.assign({}, log), { admin: adminMap[log.adminId] || { name: 'Unknown System', designation: 'System' } })));
+        // Use a Map for O(1) lookups
+        const adminMap = new Map(admins.map(a => [a.id, a]));
+        const enrichedLogs = logs.map(log => (Object.assign(Object.assign({}, log), { admin: adminMap.get(log.adminId) || { name: 'System', designation: 'Automated' } })));
         res.json(enrichedLogs);
     }
     catch (error) {

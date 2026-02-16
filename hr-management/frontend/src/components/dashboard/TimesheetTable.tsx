@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Loader2 } from "lucide-react"
 import { format } from "date-fns"
+import { API_BASE_URL } from "@/lib/config"
 
 interface TimeEntry {
     id: string
@@ -33,7 +34,7 @@ export default function TimesheetTable({ token }: { token: string }) {
 
     const fetchHistory = async () => {
         try {
-            const res = await fetch("http://localhost:4000/api/time/history?limit=30", {
+            const res = await fetch(`${API_BASE_URL}/time/history?limit=30`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (!res.ok) throw new Error("Failed to fetch history")

@@ -9,10 +9,12 @@ interface FetchState<T> {
     error: string | null;
 }
 
+import { API_BASE_URL } from "@/lib/config"
+
 // Helper to get full URL
 const getUrl = (endpoint: string) => {
     if (endpoint.startsWith('http')) return endpoint;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    const baseUrl = API_BASE_URL;
 
     // Ensure endpoint starts with / if not present
     const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;

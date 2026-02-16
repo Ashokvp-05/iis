@@ -2,15 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Activity, UserPlus, FileCheck, ShieldAlert, Settings } from "lucide-react"
 
-import { useState, useEffect } from "react"
+interface LogEntry {
+    action: string;
+    details: string;
+    createdAt: string;
+}
 
-export function ActivityLogWidget({ logs }: { logs: any[] }) {
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => {
-        setMounted(true)
-    }, [])
-
+export function ActivityLogWidget({ logs }: { logs: LogEntry[] }) {
     if (!logs || logs.length === 0) return null
 
     const getIcon = (action: string) => {
@@ -37,10 +35,10 @@ export function ActivityLogWidget({ logs }: { logs: any[] }) {
                                     {getIcon(log.action)}
                                 </div>
                                 <div>
-                                    <p className="font-medium text-slate-900 dark:text-slate-100">{log.action.replace('_', ' ')}</p>
-                                    <p className="text-xs text-muted-foreground">{log.details}</p>
-                                    <p className="text-[10px] text-slate-400 mt-1">
-                                        {mounted ? new Date(log.createdAt).toLocaleString() : ''}
+                                    <p className="font-medium text-slate-900 dark:text-slate-100 uppercase tracking-tight text-xs">{log.action.replace(/_/g, ' ')}</p>
+                                    <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{log.details}</p>
+                                    <p className="text-[9px] font-mono text-slate-400 mt-1.5" suppressHydrationWarning>
+                                        {new Date(log.createdAt).toLocaleString()}
                                     </p>
                                 </div>
                             </div>

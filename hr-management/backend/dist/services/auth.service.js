@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePassword = exports.resetPassword = exports.requestPasswordReset = exports.disable2FA = exports.activate2FA = exports.setup2FA = exports.verify2FALogin = exports.verifyCredentials = exports.requestRegistration = void 0;
+exports.logoutOthers = exports.changePassword = exports.resetPassword = exports.requestPasswordReset = exports.disable2FA = exports.activate2FA = exports.setup2FA = exports.verify2FALogin = exports.verifyCredentials = exports.requestRegistration = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -59,6 +59,7 @@ const registerSchema = zod_1.z.object({
     password: zod_1.z.string().min(6),
     name: zod_1.z.string().min(2),
     roleId: zod_1.z.string().optional(),
+    roleName: zod_1.z.string().optional(), // Added roleName support
     department: zod_1.z.string().optional(),
     designation: zod_1.z.string().optional()
 });
@@ -67,7 +68,7 @@ const loginSchema = zod_1.z.object({
     password: zod_1.z.string(),
 });
 const requestRegistration = (data) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email, password, name, roleId, department, designation } = registerSchema.parse(data);
+    const { email, password, name, roleId, roleName, department, designation } = registerSchema.parse(data);
     const existingUser = yield db_1.default.user.findUnique({
         where: { email },
     });
@@ -76,11 +77,22 @@ const requestRegistration = (data) => __awaiter(void 0, void 0, void 0, function
     }
     const hashedPassword = yield bcryptjs_1.default.hash(password, 10);
     let finalRoleId = roleId;
+    // If no ID provided, try to find by Name, or default to EMPLOYEE
     if (!finalRoleId) {
-        const employeeRole = yield db_1.default.role.findUnique({
-            where: { name: 'EMPLOYEE' }
+        const targetRoleName = roleName ? roleName.toUpperCase() : 'EMPLOYEE';
+        const role = yield db_1.default.role.findUnique({
+            where: { name: targetRoleName }
         });
-        finalRoleId = employeeRole === null || employeeRole === void 0 ? void 0 : employeeRole.id;
+        // Fallback to EMPLOYEE if specific role not found (safety net)
+        if (!role && targetRoleName !== 'EMPLOYEE') {
+            const employeeRole = yield db_1.default.role.findUnique({
+                where: { name: 'EMPLOYEE' }
+            });
+            finalRoleId = employeeRole === null || employeeRole === void 0 ? void 0 : employeeRole.id;
+        }
+        else {
+            finalRoleId = role === null || role === void 0 ? void 0 : role.id;
+        }
     }
     const user = yield db_1.default.user.create({
         data: {
@@ -136,7 +148,8 @@ const verifyCredentials = (data) => __awaiter(void 0, void 0, void 0, function* 
         email: user.email,
         roleId: user.roleId,
         role: (_a = user.role) === null || _a === void 0 ? void 0 : _a.name,
-        status: user.status
+        status: user.status,
+        tokenVersion: user.tokenVersion
     }, process.env.JWT_SECRET || 'super-secret-key', { expiresIn: '1d' });
     // Return user info sans password
     return {
@@ -170,7 +183,8 @@ const verify2FALogin = (userId, code) => __awaiter(void 0, void 0, void 0, funct
         email: user.email,
         roleId: user.roleId,
         role: (_a = user.role) === null || _a === void 0 ? void 0 : _a.name,
-        status: user.status
+        status: user.status,
+        tokenVersion: user.tokenVersion
     }, process.env.JWT_SECRET || 'super-secret-key', { expiresIn: '1d' });
     return {
         token,
@@ -280,3 +294,10 @@ const changePassword = (userId, currentPass, newPass) => __awaiter(void 0, void 
     });
 });
 exports.changePassword = changePassword;
+const logoutOthers = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    return db_1.default.user.update({
+        where: { id: userId },
+        data: { tokenVersion: { increment: 1 } }
+    });
+});
+exports.logoutOthers = logoutOthers;

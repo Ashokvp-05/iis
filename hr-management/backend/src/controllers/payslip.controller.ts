@@ -38,10 +38,13 @@ export const downloadPayslip = async (req: Request, res: Response) => {
         const requesterId = (req as any).user.id;
         const role = (req as any).user.role; // From JWT
 
-        const { path: filePath, filename } = await payslipService.getPayslipFile(id, requesterId, role);
+        const { path: filePath, filename, url } = await payslipService.getPayslipFile(id, requesterId, role);
 
         auditService.logAction('PAYSLIP_DOWNLOAD', requesterId, id, `Downloaded payslip`);
 
+        if (url) {
+            return res.redirect(url);
+        }
         res.download(filePath, filename);
     } catch (error: any) {
         if (error.message.includes("Unauthorized")) {

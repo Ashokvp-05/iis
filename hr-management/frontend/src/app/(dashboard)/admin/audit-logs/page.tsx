@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, ShieldAlert } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function AuditLogsPage() {
     const { data: session } = useSession()
@@ -13,7 +14,7 @@ export default function AuditLogsPage() {
 
     useEffect(() => {
         if (token) {
-            fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/audit-logs`, {
+            fetch(`${API_BASE_URL}/admin/audit-logs`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
                 .then(res => res.json())
