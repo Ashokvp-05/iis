@@ -1,327 +1,121 @@
-# 🏢 Rudratic HR Management System
+# 🚀 Rudratic HR Management System: Production Hub
 
-> Enterprise-grade Human Resources Management Platform with Ultra-Premium UI/UX
+A comprehensive, enterprise-grade Human Resources Management System designed for high-availability environments. Built with **Next.js 16 (Turbopack)**, **Express.js**, **PostgreSQL**, and **Prisma ORM**.
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green)](https://nodejs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue)](https://www.postgresql.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)](https://www.typescriptlang.org/)
+---
+
+## 📋 Table of Contents
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Deployment Architecture](#-deployment-architecture)
+- [Step-by-Step Production Deployment](#-step-by-step-production-deployment)
+- [Critical Production Variables](#-critical-production-variables)
+- [Pre-Deployment Checklist](#-pre-deployment-checklist)
+- [Running Locally](#-running-locally-dev-mode)
 
 ---
 
 ## ✨ Features
 
-### 🔐 Authentication & Authorization
-- ✅ Ultra-Premium dark theme login/register pages
-- ✅ Role-based access control (Admin, Manager, Employee)
-- ✅ JWT-based session management
-- ✅ Password recovery flow
-- ✅ Social login ready (Google, Microsoft, GitHub)
-
-### 📊 Core HR Modules
-- ✅ Employee Management
-- ✅ Attendance Tracking
-- ✅ Leave Management
-- ✅ Performance Reviews
-- ✅ Kudos & Recognition
-- ✅ Wellness Checks
-- ✅ Ticket System
-- ✅ Notifications & Announcements
-
-### 🎨 Premium UI/UX
-- ✅ Glassmorphism design
-- ✅ Animated backgrounds
-- ✅ Smooth transitions
-- ✅ Dark mode optimized
-- ✅ Responsive design
-- ✅ Mouse spotlight effects
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+ installed
-- PostgreSQL 15+ installed and running
-- Git installed
-
-### Option 1: Automated Start (Recommended)
-
-```powershell
-# Navigate to project root
-cd d:\HR\hr-management
-
-# Run the start script
-.\start.ps1
-```
-
-This will:
-- ✅ Check prerequisites
-- ✅ Setup database
-- ✅ Start backend server (port 4000)
-- ✅ Start frontend server (port 3000)
-- ✅ Open browser automatically
-
-### Option 2: Manual Start
-
-#### Terminal 1 - Backend
-```powershell
-cd backend
-npm install
-npx prisma generate
-npm run dev
-```
-
-#### Terminal 2 - Frontend
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
----
-
-## 🌐 Access Points
-
-| Service | URL | Description |
-|---------|-----|-------------|
-| **Frontend** | http://localhost:3000 | Main application |
-| **Backend API** | http://localhost:4000 | REST API |
-| **Prisma Studio** | http://localhost:5555 | Database GUI |
-| **Auth Test** | http://localhost:3000/auth-test | Test authentication |
-
----
-
-## 👤 Default Accounts
-
-| Role | Email | Password | Access Level |
-|------|-------|----------|--------------|
-| **Admin** | admin@rudratic.com | Rudratic@Admin#2026 | Full system access |
-| **Manager** | manager@rudratic.com | Rudratic@Mgr#2026 | Team management |
-| **Employee** | employee@rudratic.com | Rudratic@User#2026 | Basic features |
-
----
-
-## 📁 Project Structure
-
-```
-hr-management/
-├── backend/                 # Express.js API Server
-│   ├── src/
-│   │   ├── controllers/    # Request handlers
-│   │   ├── services/       # Business logic
-│   │   ├── routes/         # API routes
-│   │   ├── middleware/     # Custom middleware
-│   │   └── server.ts       # Entry point
-│   ├── prisma/
-│   │   ├── schema.prisma   # Database schema
-│   │   └── seed.ts         # Database seeder
-│   └── .env                # Backend configuration
-│
-├── frontend/               # Next.js 16 Application
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── (auth)/    # Authentication pages
-│   │   │   └── (dashboard)/ # Protected pages
-│   │   ├── components/    # Reusable components
-│   │   ├── auth.ts        # NextAuth configuration
-│   │   └── middleware.ts  # Route protection
-│   └── .env.local         # Frontend configuration
-│
-├── start.ps1              # Quick start script
-├── SETUP_GUIDE.md         # Detailed setup guide
-└── README.md              # This file
-```
-
----
-
-## 🔧 Configuration
-
-### Backend (.env)
-```env
-PORT=4000
-DATABASE_URL="postgresql://user:password@localhost:5432/hr_db"
-JWT_SECRET="your-secret-key"
-```
-
-### Frontend (.env.local)
-```env
-AUTH_SECRET="your-auth-secret"
-NEXTAUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_API_URL="http://localhost:4000/api"
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-```
-
----
-
-## 🧪 Testing the Authentication Flow
-
-1. **Clear Session** (if needed)
-   ```
-   Visit: http://localhost:3000/logout
-   ```
-
-2. **Test Login**
-   ```
-   Visit: http://localhost:3000/login
-   Use any default account credentials
-   ```
-
-3. **Test Registration**
-   ```
-   Visit: http://localhost:3000/register
-   Create a new account
-   ```
-
-4. **Test Protected Routes**
-   ```
-   Try accessing /dashboard without login
-   Should redirect to /login
-   ```
-
----
-
-## 📚 Documentation
-
-- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - Complete setup instructions
-- **[AUTH_INTEGRATION_GUIDE.md](./AUTH_INTEGRATION_GUIDE.md)** - Authentication system details
-- **[API Documentation](./backend/README.md)** - Backend API reference
+### **Core Modules**
+- ✅ **Authentication & Authorization** - JWT-based auth with role-based access control (RBAC)
+- ✅ **Employee Management** - Complete employee lifecycle management
+- ✅ **Time & Attendance** - Clock in/out, overtime tracking, remote work support
+- ✅ **Leave Management** - Leave requests, approvals, balance tracking
+- ✅ **Payslip Generation** - Automated payslip creation and distribution via Supabase Storage
+- ✅ **Performance Tracking** - Employee performance monitoring and analytics
+- ✅ **Ticketing System** - Issue tracking and resolution
+- ✅ **Admin Dashboard** - Real-time system monitoring and controls
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- **Framework**: Next.js 16.1.6 (App Router)
-- **UI Library**: React 19
-- **Styling**: Tailwind CSS 4
-- **Animations**: Framer Motion
-- **Auth**: NextAuth.js v5
-- **Forms**: React Hook Form + Zod
-- **Icons**: Lucide React
+### **Frontend**
+- **Next.js 16 (Turbopack)** / React 19
+- **Tailwind CSS 4** (Modern Design System)
+- **Framer Motion 12** (Premium Animations)
+- **NextAuth.js 5** (Secure Sessions)
 
-### Backend
-- **Runtime**: Node.js + TypeScript
-- **Framework**: Express.js
-- **ORM**: Prisma
-- **Database**: PostgreSQL
-- **Auth**: JWT + bcrypt
-- **Validation**: Zod
+### **Backend**
+- **Node.js / Express.js**
+- **Prisma ORM** (v5.22.0)
+- **PostgreSQL** (Managed)
+- **Supabase Storage** (For document persistence)
 
 ---
 
-## 🐛 Troubleshooting
+## 🌐 Deployment Architecture
 
-### Port Already in Use
-```powershell
-# Kill all node processes
-Get-Process -Name node | Stop-Process -Force
-
-# Restart servers
-.\start.ps1
-```
-
-### Database Connection Error
-```powershell
-# Check PostgreSQL service
-Get-Service -Name postgresql*
-
-# Verify database exists
-psql -U postgres -c "\l"
-```
-
-### Prisma Client Error
-```powershell
-cd backend
-npx prisma generate
-```
-
-For more troubleshooting, see [SETUP_GUIDE.md](./SETUP_GUIDE.md#-troubleshooting)
+The system is optimized for a distributed architecture:
+- **Frontend Layer**: Hosted on **Vercel** or **Render** (Next.js 16 with SSR/ISR support).
+- **Service Layer**: Node.js/Express API cluster on **Render** / **Railway**.
+- **Data Tier**: Managed PostgreSQL (**Supabase** / **Neon**).
+- **Object Storage**: **Supabase Storage** (required for permanent payslip persistence).
 
 ---
 
-## 📈 Development Workflow
+## 🛠️ Step-by-Step Production Deployment
 
-### Database Changes
-```powershell
-# Create migration
-cd backend
-npx prisma migrate dev --name your_migration_name
+### 1. Database Provisioning (Managed)
+1. Provision a PostgreSQL instance on [Supabase](https://supabase.com).
+2. Create a bucket named `hr-documents` in Supabase Storage for payslip persistence.
+3. Configure your local machine to target the production DB:
+   ```bash
+   # From backend/
+   sh DATABASE_URL="your_production_url" npx prisma migrate deploy
+   ```
 
-# Apply migrations
-npx prisma migrate deploy
+### 2. Backend Deployment (Render.com)
+1. **New Web Service** -> Connect Repo.
+2. **Root Directory**: `backend`
+3. **Build Command**: `npm install && npm run build`
+4. **Start Command**: `npm start`
+5. **Environment Variables**:
+   - `DATABASE_URL`: Production SQL string.
+   - `JWT_SECRET`: High-entropy string.
+   - `SUPABASE_URL`: For Object Storage.
+   - `SUPABASE_ANON_KEY`: Client-side access key.
+   - `SUPABASE_SERVICE_ROLE_KEY`: Server-side storage bypass.
+   - `CORS_ORIGIN`: Your production frontend URL.
 
-# Reset database (dev only)
-npx prisma migrate reset
+### 3. Frontend Deployment (Vercel/Render)
+1. **New Project** -> Connect Repo.
+2. **Root Directory**: `frontend`
+3. **Framework**: Next.js
+4. **Environment Variables**:
+   - `NEXT_PUBLIC_API_URL`: Your deployed backend API URL.
+   - `AUTH_SECRET`: Generate using `openssl rand -base64 32`
+   - `NEXTAUTH_URL`: Your production frontend URL.
+
+---
+
+## ✅ Pre-Deployment Checklist
+
+- [x] **Prisma Client**: Regenerated on build (`npx prisma generate`).
+- [x] **TypeScript Build**: All compilation errors solved.
+- [x] **Turbopack Compatibility**: `styled-jsx` issues resolved.
+- [x] **Privacy Guard**: Dashboard encryption modes verified.
+- [x] **Build Verification**: `npm run build` passes for both tiers.
+
+---
+
+## 🚀 Running Locally (Dev Mode)
+
+```bash
+# 1. Install & Run Backend
+cd backend && npm install && npm run dev
+
+# 2. Install & Run Frontend
+cd ../frontend && npm install && npm run dev
 ```
 
-### Code Quality
-```powershell
-# Frontend linting
-cd frontend
-npm run lint
-
-# Type checking
-npm run type-check
-```
-
 ---
 
-## 🚢 Deployment
-
-### Production Build
-
-#### Frontend
-```powershell
-cd frontend
-npm run build
-npm run start
-```
-
-#### Backend
-```powershell
-cd backend
-npm run build
-npm run start:prod
-```
-
-### Environment Variables
-- Update all secrets in production
-- Use strong random strings for `AUTH_SECRET` and `JWT_SECRET`
-- Configure production database URL
-- Set up email service for password reset
+## 🤝 Support & Engineering
+**Rudratic Technologies Core Team**  
+For technical escalation, contact: `engineering@rudratic.com`  
+*Copyright © 2026 Rudratic Technologies. All Rights Reserved.*
 
 ---
-
-## 📝 License
-
-This project is proprietary software developed for Rudratic Technologies.
-
----
-
-## 👥 Support
-
-For issues or questions:
-1. Check the [SETUP_GUIDE.md](./SETUP_GUIDE.md)
-2. Review the [Troubleshooting](#-troubleshooting) section
-3. Contact the development team
-
----
-
-## 🎯 Current Status
-
-✅ **Authentication System** - Fully integrated and tested  
-✅ **Database Schema** - Complete with all HR modules  
-✅ **Backend API** - All endpoints functional  
-✅ **Frontend UI** - Ultra-premium design implemented  
-✅ **Route Protection** - Middleware configured  
-✅ **Session Management** - NextAuth.js integrated  
-
-**Ready for review and testing!** 🚀
-
----
-
-<div align="center">
-  <strong>Built with ❤️ by Rudratic Technologies</strong>
-</div>
+**Made with ❤️ for HR Professionals.**

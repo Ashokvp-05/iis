@@ -163,7 +163,7 @@
   }
 
   .neo-glow {
-    box-shadow: 0 0 20px oklch(vvar(--primary) / 0.1);
+    box-shadow: 0 0 20px oklch(var(--primary) / 0.1);
   }
 
   .text-gradient {
@@ -175,6 +175,7 @@
 [data-nextjs-toast] {
   display: none !important;
 }
+
 .nextjs-toast-errors-parent {
   display: none !important;
 }
@@ -191,4 +192,31 @@
   filter: blur(12px) grayscale(1);
   opacity: 0.5;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dashboard Animations */
+@keyframes gradient-x {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 15s ease infinite;
+}
+
+.privacy-blur main,
+.privacy-blur section,
+.privacy-blur div:not(.privacy-toggle-container) {
+  filter: blur(12px) grayscale(1);
+  transition: filter 0.5s ease;
 }

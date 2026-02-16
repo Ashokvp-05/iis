@@ -62,17 +62,23 @@ export default function PayrollPage() {
             // Fetch Users
             fetch(`${API_BASE_URL}/users`, {
                 headers: { Authorization: `Bearer ${token}` }
-            }).then(res => res.ok && res.json().then(setUsers))
+            }).then(res => {
+                if (res.ok) res.json().then(data => setUsers(data))
+            })
 
             // Fetch All Payslips
             fetch(`${API_BASE_URL}/payslips/all`, {
                 headers: { Authorization: `Bearer ${token}` }
-            }).then(res => res.ok && res.json().then(setPayslips))
+            }).then(res => {
+                if (res.ok) res.json().then(data => setPayslips(data))
+            })
 
             // Fetch Batches
             fetch(`${API_BASE_URL}/payroll/batches`, {
                 headers: { Authorization: `Bearer ${token}` }
-            }).then(res => res.ok && res.json().then(setBatches))
+            }).then(res => {
+                if (res.ok) res.json().then(data => setBatches(data))
+            })
 
         } catch (error) {
             console.error("Failed to load data", error)

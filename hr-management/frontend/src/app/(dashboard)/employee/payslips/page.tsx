@@ -98,7 +98,7 @@ export default function EmployeePayslipsPage() {
                                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-950 p-0 border-none rounded-[2rem]">
                                         {selectedPayslip && (
                                             <div className="p-6">
-                                                <PayslipDetailedView data={selectedPayslip} onClose={() => { }} />
+                                                <PayslipDetailedView data={selectedPayslip} />
                                             </div>
                                         )}
                                     </DialogContent>

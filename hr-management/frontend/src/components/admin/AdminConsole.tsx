@@ -94,7 +94,11 @@ export function AdminConsole({ role, token, overview, pendingUsers, pendingLeave
                         </TabsContent>
 
                         <TabsContent value="remote" className="mt-0">
-                            <RemoteValidationWidget users={overview.remoteUsers} />
+                            <RemoteValidationWidget status={overview.validationStatus || {
+                                totalChecked: overview.remoteUsers?.length || 0,
+                                verified: overview.remoteUsers?.length || 0,
+                                flagged: 0
+                            }} />
                         </TabsContent>
 
                         <TabsContent value="tickets" className="mt-0">

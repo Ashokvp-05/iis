@@ -35,13 +35,8 @@ export default function PayrollManagementPage() {
     }
 
     useEffect(() => {
-        // Mocking for now since I haven't implemented getBatches endpoint yet
-        setBatches([
-            { id: "1", month: "February", year: 2026, status: "DRAFT", payslipCount: 45, createdAt: new Date() },
-            { id: "2", month: "January", year: 2026, status: "RELEASED", payslipCount: 42, createdAt: new Date() }
-        ])
-        setLoading(false)
-    }, [token]) // Added token dependency
+        if (token) fetchBatches()
+    }, [token])
 
     const getStatusColor = (status: string) => {
         switch (status) {

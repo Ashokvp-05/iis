@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Trophy, ThumbsUp, Star, Award, Heart } from "lucide-react"
@@ -60,7 +60,7 @@ export function KudosFeed() {
                                             <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{k.from}</p>
                                             <span className="text-[10px] text-slate-400">{k.time}</span>
                                         </div>
-                                        <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">"{k.message}"</p>
+                                        <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">&quot;{k.message}&quot;</p>
                                         <div className="flex items-center gap-1 mt-2">
                                             <div className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-1">
                                                 {getIcon(k.category)}

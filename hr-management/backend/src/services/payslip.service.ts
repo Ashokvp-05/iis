@@ -343,8 +343,17 @@ export const deletePayslip = async (id: string) => {
 };
 
 export const updatePayslip = async (id: string, data: { month?: string, year?: number, amount?: number, status?: PayrollStatus }) => {
+    const updateData: any = { ...data };
+
+    if (data.amount !== undefined) {
+        updateData.basicSalary = data.amount;
+        updateData.netSalary = data.amount;
+        updateData.grossSalary = data.amount;
+        delete updateData.amount;
+    }
+
     return prisma.payslip.update({
         where: { id },
-        data
+        data: updateData
     });
 };

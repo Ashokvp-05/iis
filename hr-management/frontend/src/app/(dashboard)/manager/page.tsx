@@ -374,22 +374,6 @@ export default async function ManagerDashboardPage() {
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Protocol v.4.0.2-ALPHA</p>
                 </div>
             </div>
-
-            <style jsx global>{`
-                @keyframes gradient-x {
-                    0% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                    100% { background-position: 0% 50%; }
-                }
-                .animate-gradient-x {
-                    background-size: 200% 200%;
-                    animation: gradient-x 15s ease infinite;
-                }
-                .privacy-blur main, .privacy-blur section, .privacy-blur div:not(.privacy-toggle-container) {
-                    filter: blur(12px) grayscale(1);
-                    transition: filter 0.5s ease;
-                }
-            `}</style>
         </div>
     )
 }
