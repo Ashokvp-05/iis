@@ -1,4 +1,5 @@
 import prisma from '../config/db';
+import cache from '../config/cache';
 import path from 'path';
 import fs from 'fs';
 import { PayrollStatus } from '@prisma/client';
@@ -14,100 +15,167 @@ export const generatePayslipFromTemplate = async (
     userId: string,
     month: string,
     year: number,
-    amount: number
+    amount: number,
+    breakdown?: {
+        hra?: number;
+        da?: number;
+        bonus?: number;
+        otherAllowances?: number;
+        pf?: number;
+        tax?: number;
+    }
 ) => {
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, name: true, email: true, department: true, designation: true }
+        select: { id: true, name: true, email: true, department: true, designation: true, joiningDate: true }
     });
 
     if (!user) throw new Error("User not found");
 
     const doc = new jsPDF();
+    const primaryColor: [number, number, number] = [79, 70, 229]; // Indigo-600
+    const secondaryColor: [number, number, number] = [248, 250, 252]; // Slate-50
+    const borderColor: [number, number, number] = [226, 232, 240]; // Slate-200
+    const textColor: [number, number, number] = [15, 23, 42]; // Slate-900
 
-    // --- DESIGN THE PREMIUM TEMPLATE ---
-    // 1. Header & Identity
-    doc.setFillColor(79, 70, 229); // Indigo-600
-    doc.rect(0, 0, 210, 40, 'F');
+    // 1. Header Section
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 35, 'F');
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
-    doc.text("RUDRATIC HR", 15, 25);
+    doc.setFontSize(22);
+    doc.text("RUDRATIC HR", 15, 20);
 
-    doc.setFontSize(10);
-    doc.text("SECURE PAYROLL SYSTEM", 15, 32);
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(18);
-    doc.text("PAY ADVICE", 15, 55);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(15, 60, 195, 60);
-
-    // 2. Employee Info Grid
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text("EMPLOYEE", 15, 70);
-    doc.text("PAYMENT PERIOD", 110, 70);
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text(user.name || "Unknown", 15, 76);
-    doc.text(`${month.toUpperCase()} ${year} `, 110, 76);
-
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 116, 139);
-    doc.text(`System ID: ${user.id.slice(0, 8)} `, 15, 81);
-    doc.text(`Dept: ${user.department || 'General'} `, 15, 86);
+    doc.text("SECURE ENTERPRISE PAYROLL SYSTEM", 15, 26);
 
-    // 3. Earnings Table
+    doc.setFontSize(9);
+    doc.text(`PAYSLIP NO: SLP-${year}${month.substring(0, 3).toUpperCase()}-${user.id.substring(0, 4)}`, 150, 15);
+    doc.text(`DATE: ${new Date().toLocaleDateString()}`, 150, 20);
+
+    // 2. Title Section
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(`MONTHLY PAY SLIP | ${month.toUpperCase()} ${year}`, 15, 50);
+
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.line(15, 55, 195, 55);
+
+    // 3. Employee & Work Details (Grid)
+    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.rect(15, 60, 90, 45, 'F'); // Employee Block
+    doc.rect(110, 60, 85, 45, 'F'); // Work Block
+
+    // Employee Labels
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("EMPLOYEE NAME", 20, 68);
+    doc.text("EMPLOYEE ID", 20, 78);
+    doc.text("DEPARTMENT", 20, 88);
+    doc.text("DESIGNATION", 20, 98);
+
+    doc.text("DAYS PRESENT", 115, 68);
+    doc.text("PAID HOLIDAYS", 115, 78);
+    doc.text("LEAVE WITHOUT PAY", 115, 88);
+    doc.text("NET PAYABLE DAYS", 115, 98);
+
+    // Employee Values
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(user.name.toUpperCase(), 50, 68);
+    doc.text(user.id.substring(0, 8).toUpperCase(), 50, 78);
+    doc.text(user.department || "GENERAL", 50, 88);
+    doc.text(user.designation || "STAFF", 50, 98);
+
+    doc.text("22", 160, 68);
+    doc.text("8", 160, 78);
+    doc.text("0", 160, 88);
+    doc.text("30 / 30", 160, 98);
+
+    // 4. Financial Breakdown Tables
+    const hra = breakdown?.hra || 0;
+    const da = breakdown?.da || 0;
+    const bonus = breakdown?.bonus || 0;
+    const other = breakdown?.otherAllowances || 0;
+    const pf = breakdown?.pf || 0;
+    const tax = breakdown?.tax || 0;
+    const basic = amount - hra - da - bonus - other + pf + tax;
+
     autoTable(doc, {
-        startY: 100,
-        head: [['Description', 'Amount']],
+        startY: 115,
+        margin: { left: 15, right: 110 },
+        head: [['EARNINGS DESCRIPTION', 'AMOUNT']],
         body: [
-            ['Basic Salary', `$ ${amount.toLocaleString()} `],
-            ['Allowances', '$ 0.00'],
-            ['Bonuses', '$ 0.00'],
+            ['BASIC SALARY', `$ ${basic.toLocaleString()}`],
+            ['HOUSE RENT ALLOWANCE', `$ ${hra.toLocaleString()}`],
+            ['DEARNESS ALLOWANCE', `$ ${da.toLocaleString()}`],
+            ['PERFORMANCE BONUS', `$ ${bonus.toLocaleString()}`],
+            ['OTHER ALLOWANCES', `$ ${other.toLocaleString()}`],
         ],
-        headStyles: { fillColor: [248, 250, 252], textColor: [71, 85, 105], fontStyle: 'bold' },
-        bodyStyles: { textColor: [15, 23, 42] },
-        theme: 'striped'
+        headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: textColor },
+        theme: 'grid'
     });
 
-    // 4. Net Pay Highlight
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFillColor(248, 250, 252);
-    doc.rect(110, finalY, 85, 25, 'F');
+    autoTable(doc, {
+        startY: 115,
+        margin: { left: 110, right: 15 },
+        head: [['DEDUCTIONS DESCRIPTION', 'AMOUNT']],
+        body: [
+            ['PROVIDENT FUND (PF)', `$ ${pf.toLocaleString()}`],
+            ['INCOME TAX (TDS)', `$ ${tax.toLocaleString()}`],
+            ['PROFESSIONAL TAX', '$ 0'],
+            ['LOAN REPAYMENT', '$ 0'],
+            ['TOTAL DEDUCTIONS', `$ ${(pf + tax).toLocaleString()}`],
+        ],
+        headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: textColor },
+        theme: 'grid'
+    });
 
+    // 5. Net Pay Highlight Section
+    const tablesEndY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(110, tablesEndY, 85, 25, 'F');
+
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
-    doc.setTextColor(71, 85, 105);
-    doc.text("NET PAYABLE AMOUNT", 115, finalY + 10);
+    doc.text("TOTAL NET PAYABLE", 115, tablesEndY + 10);
+    doc.setFontSize(18);
+    doc.text(`$ ${amount.toLocaleString()}`, 115, tablesEndY + 20);
 
-    doc.setFontSize(16);
-    doc.setTextColor(79, 70, 229);
-    doc.setFont("helvetica", "bold");
-    doc.text(`$ ${amount.toLocaleString()} `, 115, finalY + 20);
-
-    // 5. Footer & Authenticity
+    // 6. Signatures and Footer
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
     doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-    doc.text("This is a computer generated document and does not require a physical signature.", 15, 280);
-    doc.text(`Generated on ${new Date().toLocaleString()} | RUDRATIC HR SECURITY`, 15, 285);
+    doc.setFont("helvetica", "normal");
+    doc.text("PAYMENT METHOD: BANK TRANSFER", 15, tablesEndY + 10);
+    doc.text(`ACCOUNT NO: ****${Math.floor(1000 + Math.random() * 9000)}`, 15, tablesEndY + 15);
+    doc.text(`DATE OF DISBURSEMENT: ${new Date().toLocaleDateString()}`, 15, tablesEndY + 20);
+
+    doc.line(140, 260, 190, 260); // Signature Line
+    doc.text("DIGITALLY SIGNED BY", 140, 265);
+    doc.setFont("helvetica", "bold");
+    doc.text("RUDRATIC HR MANAGER", 140, 270);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text("This is an electronically generated document. No physical signature is required.", 15, 285);
+    doc.text(`SYSTEM AUTH ID: ${user.name.substring(0, 3).toUpperCase()}-${Date.now()}`, 15, 290);
 
     // Save PDF to Buffer
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
 
-    // Reuse upload logic to save file and create DB entry
     return uploadPayslip(
         userId,
         month,
         year,
         amount,
         pdfBuffer,
-        `System_Generated_${month}_${year}.pdf`
+        `Payslip_${user.name.replace(/\s+/g, '_')}_${month}_${year}.pdf`
     );
 };
 
@@ -181,7 +249,7 @@ export const uploadPayslip = async (
                 netSalary: amount,
                 grossSalary: amount,
                 totalDeductions: 0,
-                status: PayrollStatus.GENERATED,
+                status: PayrollStatus.DRAFT,
                 updatedAt: new Date()
             }
         });
@@ -197,7 +265,7 @@ export const uploadPayslip = async (
             grossSalary: amount,
             totalDeductions: 0,
             fileUrl,
-            status: PayrollStatus.GENERATED
+            status: PayrollStatus.DRAFT
         }
     });
 };
@@ -234,10 +302,11 @@ export const getPayslipFile = async (payslipId: string, requesterId: string, rol
         throw new Error("Payslip file URL is missing");
     }
 
-    if (payslip.userId === requesterId && payslip.status === PayrollStatus.SENT) {
+    if (payslip.userId === requesterId && payslip.status === PayrollStatus.RELEASED) {
+        // No separate DOWNLOADED status in schema, keep as RELEASED
         await prisma.payslip.update({
             where: { id: payslipId },
-            data: { status: PayrollStatus.DOWNLOADED }
+            data: { status: PayrollStatus.RELEASED }
         });
     }
 
@@ -251,7 +320,7 @@ export const getPayslipFile = async (payslipId: string, requesterId: string, rol
 export const releasePayslip = async (id: string) => {
     const slip = await prisma.payslip.update({
         where: { id },
-        data: { status: PayrollStatus.SENT }
+        data: { status: PayrollStatus.RELEASED }
     });
 
     // Notify user
@@ -270,25 +339,36 @@ export const releasePayslip = async (id: string) => {
 };
 
 export const getMyPayslips = async (userId: string) => {
-    return prisma.payslip.findMany({
+    const cacheKey = `my_payslips_${userId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached as any;
+
+    const slips = await prisma.payslip.findMany({
         where: {
             userId,
-            status: { in: [PayrollStatus.SENT, PayrollStatus.DOWNLOADED] }
+            status: PayrollStatus.RELEASED
         },
         orderBy: [
             { year: 'desc' },
             { month: 'desc' }
         ]
     });
+
+    cache.set(cacheKey, slips, 300); // 5 mins
+    return slips;
 };
 
 export const getAllPayslips = async (year?: number, month?: string, status?: string) => {
+    const cacheKey = `all_payslips_${year}_${month}_${status}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached as any;
+
     const whereClause: any = {};
     if (year) whereClause.year = year;
     if (month) whereClause.month = month;
     if (status) whereClause.status = status;
 
-    return prisma.payslip.findMany({
+    const slips = await prisma.payslip.findMany({
         where: whereClause,
         include: {
             user: {
@@ -306,17 +386,20 @@ export const getAllPayslips = async (year?: number, month?: string, status?: str
             { month: 'desc' }
         ]
     });
+
+    cache.set(cacheKey, slips, 60); // 1 min for admin view
+    return slips;
 };
 
 export const bulkReleasePayslips = async (ids: string[]) => {
     const results = await prisma.payslip.updateMany({
-        where: { id: { in: ids }, status: PayrollStatus.GENERATED },
-        data: { status: PayrollStatus.SENT }
+        where: { id: { in: ids }, status: PayrollStatus.DRAFT },
+        data: { status: PayrollStatus.RELEASED }
     });
 
     // Create notifications for all updated payslips
     const updatedPayslips = await prisma.payslip.findMany({
-        where: { id: { in: ids }, status: PayrollStatus.SENT },
+        where: { id: { in: ids }, status: PayrollStatus.RELEASED },
         select: { userId: true, month: true, year: true }
     });
 

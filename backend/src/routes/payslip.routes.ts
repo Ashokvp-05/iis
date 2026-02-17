@@ -14,7 +14,7 @@ router.get('/:id/download', payslipController.downloadPayslip);
 
 // Admin / Manager actions
 // Allow broad access for basic listing, specific actions guarded below
-router.get('/', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'MANAGER']), payslipController.getAllPayslips);
+router.get('/all', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'MANAGER']), payslipController.getAllPayslips);
 
 // Admin Only
 router.post('/upload', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), upload.single('file'), payslipController.uploadPayslip);

@@ -197,3 +197,47 @@ export const deleteUser = async (req: Request, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const getSalaryConfig = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const config = await (prisma.salaryConfig as any).findUnique({
+            where: { userId: id }
+        });
+
+        if (!config) {
+            return res.status(200).json({
+                basicSalary: 0,
+                hra: 0,
+                da: 0,
+                bonus: 0,
+                otherAllowances: 0,
+                pf: 0,
+                tax: 0
+            });
+        }
+        res.json(config);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateSalaryConfig = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const data = req.body;
+
+        const config = await (prisma.salaryConfig as any).upsert({
+            where: { userId: id },
+            update: data,
+            create: { ...data, userId: id }
+        });
+
+        const adminId = (req as any).user.id;
+        auditService.logAction('SALARY_CONFIG_UPDATE', adminId, id, `Updated salary configuration for user ${id}`);
+
+        res.json(config);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};

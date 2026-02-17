@@ -28,6 +28,7 @@ const adminItems = [
     { name: "Overview", href: "/admin" },
     { name: "Users", href: "/admin/users" },
     { name: "Leaves", href: "/admin/leaves" },
+    { name: "Payroll", href: "/admin/payroll" },
     { name: "Reports", href: "/admin/reports" },
     { name: "Announcements", href: "/admin/announcements" },
     { name: "Holidays", href: "/admin/holidays" },

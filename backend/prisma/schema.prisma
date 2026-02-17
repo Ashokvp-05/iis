@@ -30,6 +30,7 @@ model User {
   googleId         String?         @unique @map("google_id")
   twoFactorEnabled Boolean         @default(false) @map("two_factor_enabled")
   twoFactorSecret  String?         @map("two_factor_secret")
+  tokenVersion     Int             @default(1) @map("token_version")
   approvalSteps    ApprovalStep[]
   expenseClaims    ExpenseClaim[]
   givenKudos       Kudos[]         @relation("GivenKudos")
@@ -39,15 +40,14 @@ model User {
   notifications    Notification[]
   payslips         Payslip[]
   salaryAdvances   SalaryAdvance[]
+  salaryConfig     SalaryConfig?
   ticketComments   TicketComment[]
   assignedTickets  Ticket[]        @relation("AssignedTickets")
   tickets          Ticket[]        @relation("CreatedTickets")
   timeEntries      TimeEntry[]
   tags             UserTag[]
-  tokenVersion     Int             @default(1) @map("token_version")
   role             Role?           @relation(fields: [roleId], references: [id])
   wellnessChecks   WellnessCheck[]
-  salaryConfig     SalaryConfig?
 
   @@index([email])
   @@index([status])
@@ -265,16 +265,16 @@ model SalaryConfig {
 }
 
 model PayrollBatch {
-  id          String        @id @default(uuid())
-  month       String
-  year        Int
-  status      PayrollStatus @default(DRAFT)
-  createdBy   String        @map("created_by")
-  approvedBy  String?       @map("approved_by")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  releasedAt  DateTime?     @map("released_at")
-  payslips    Payslip[]
+  id         String        @id @default(uuid())
+  month      String
+  year       Int
+  status     PayrollStatus @default(DRAFT)
+  createdBy  String        @map("created_by")
+  approvedBy String?       @map("approved_by")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  releasedAt DateTime?     @map("released_at")
+  payslips   Payslip[]
 
   @@unique([month, year])
   @@map("payroll_batches")
@@ -283,34 +283,27 @@ model PayrollBatch {
 model Payslip {
   id              String        @id @default(uuid())
   userId          String        @map("user_id")
-  batchId         String?       @map("batch_id")
   month           String
   year            Int
-  payNumber       String?       @unique @map("pay_number")
-  
-  // Earnings
+  fileUrl         String?       @map("file_url")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
   basicSalary     Decimal       @map("basic_salary") @db.Decimal(10, 2)
-  hra             Decimal       @default(0) @db.Decimal(10, 2)
-  da              Decimal       @default(0) @db.Decimal(10, 2)
+  batchId         String?       @map("batch_id")
   bonus           Decimal       @default(0) @db.Decimal(10, 2)
-  otherAllowances Decimal       @default(0) @map("other_allowances") @db.Decimal(10, 2)
+  da              Decimal       @default(0) @db.Decimal(10, 2)
+  generatedAt     DateTime      @default(now()) @map("generated_at")
   grossSalary     Decimal       @map("gross_salary") @db.Decimal(10, 2)
-
-  // Deductions
+  hra             Decimal       @default(0) @db.Decimal(10, 2)
+  leaveDeduction  Decimal       @default(0) @map("leave_deduction") @db.Decimal(10, 2)
+  netSalary       Decimal       @map("net_salary") @db.Decimal(10, 2)
+  otherAllowances Decimal       @default(0) @map("other_allowances") @db.Decimal(10, 2)
+  payNumber       String?       @unique @map("pay_number")
   pfDeduction     Decimal       @default(0) @map("pf_deduction") @db.Decimal(10, 2)
   taxDeduction    Decimal       @default(0) @map("tax_deduction") @db.Decimal(10, 2)
-  leaveDeduction  Decimal       @default(0) @map("leave_deduction") @db.Decimal(10, 2)
   totalDeductions Decimal       @map("total_deductions") @db.Decimal(10, 2)
-  
-  netSalary       Decimal       @map("net_salary") @db.Decimal(10, 2)
-  
-  fileUrl         String?       @map("file_url")
   status          PayrollStatus @default(DRAFT)
-  generatedAt     DateTime      @default(now()) @map("generated_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  
+  batch           PayrollBatch? @relation(fields: [batchId], references: [id])
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  batch           PayrollBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   @@unique([userId, month, year])
   @@index([userId])
@@ -362,8 +355,8 @@ model ApprovalStep {
   processedAt  DateTime?     @map("processed_at")
   createdAt    DateTime      @default(now()) @map("created_at")
   approver     User          @relation(fields: [approverId], references: [id])
-  expenseClaim    ExpenseClaim?  @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "expense_claim_fk")
-  salaryAdvance   SalaryAdvance? @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "salary_advance_fk")
+  expenseClaim ExpenseClaim  @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "expense_claim_fk")
+  salaryAdvance SalaryAdvance @relation(fields: [claimId], references: [id], onDelete: Cascade, map: "salary_advance_fk")
 
   @@map("approval_steps")
 }
@@ -440,11 +433,8 @@ enum TicketStatus {
 
 enum PayrollStatus {
   DRAFT
-  GENERATED
   APPROVED
   LOCKED
-  SENT
-  DOWNLOADED
   RELEASED
 }
 

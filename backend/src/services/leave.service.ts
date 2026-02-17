@@ -1,4 +1,5 @@
 import prisma from '../config/db';
+import cache from '../config/cache';
 import { LeaveType, LeaveStatus, NotificationType } from '@prisma/client';
 
 interface CreateLeaveRequestDTO {
@@ -60,7 +61,11 @@ export const getAllRequests = async (departmentId?: string) => {
     });
 };
 
-export const getBalance = async (userId: string, year = new Date().getFullYear()) => {
+export const getLeaveBalance = async (userId: string, year = new Date().getFullYear()) => {
+    const cacheKey = `leave_balance_${userId}_${year}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached as any;
+
     let balance = await prisma.leaveBalance.findUnique({
         where: { userId_year: { userId, year } }
     });
@@ -71,8 +76,12 @@ export const getBalance = async (userId: string, year = new Date().getFullYear()
             data: { userId, year } // Uses defaults from schema
         });
     }
+
+    cache.set(cacheKey, balance, 300); // Cache for 5 minutes
     return balance;
 };
+
+export const getBalance = getLeaveBalance;
 
 export const updateStatus = async (requestId: string, status: LeaveStatus, adminId: string, reason?: string) => {
     return prisma.$transaction(async (tx) => {

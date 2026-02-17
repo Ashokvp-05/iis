@@ -81,29 +81,22 @@ export default async function DashboardPage() {
     const workingDaysSoFar = Math.max(1, differenceInBusinessDays(todayDate, startOfMonthDate) + 1)
     const todayIso = format(todayDate, 'yyyy-MM-dd')
 
+    let activeEntry = null
+
     try {
-        const [summaryRes, balanceRes, payslipRes, calendarRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/time/summary`, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(`${API_BASE_URL}/leaves/balance`, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(`${API_BASE_URL}/payslips/my`, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(`${API_BASE_URL}/calendar?start=${todayIso}&end=${todayIso}`, { headers: { Authorization: `Bearer ${token}` } })
-        ])
+        const res = await fetch(`${API_BASE_URL}/dashboard/employee`, {
+            headers: { Authorization: `Bearer ${token}` },
+            next: { revalidate: 60 } // Cache for 1 minute on Next.js side too
+        })
 
-        if (summaryRes.ok) summary = await summaryRes.json()
-        if (balanceRes.ok) leaveBalance = await balanceRes.json()
-
-        if (payslipRes.ok) {
-            const payslips = await payslipRes.json()
-            if (Array.isArray(payslips) && payslips.length > 0) {
-                // Sort by year/month desc to get latest
-                latestPayslip = payslips.sort((a: any, b: any) => (b.year - a.year) || (new Date(`${b.month} 1`).getMonth() - new Date(`${a.month} 1`).getMonth()))[0]
-            }
+        if (res.ok) {
+            const data = await res.json()
+            summary = data.summary || summary
+            leaveBalance = data.leaveBalance || leaveBalance
+            latestPayslip = data.latestPayslip
+            todayEvents = data.calendar || []
+            activeEntry = data.activeEntry
         }
-
-        if (calendarRes.ok) {
-            todayEvents = await calendarRes.json()
-        }
-
     } catch (e) {
         console.error("Failed to fetch dashboard data")
     }
@@ -192,7 +185,7 @@ export default async function DashboardPage() {
                             </div>
 
                             <div className="h-[250px] w-full">
-                                <AttendanceChart token={token} />
+                                <AttendanceChart token={token} initialData={summary} />
                             </div>
                         </Card>
 
@@ -203,7 +196,7 @@ export default async function DashboardPage() {
                     <div className="xl:col-span-4 space-y-8">
                         {/* 1. TIME TRACKER */}
                         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-4 shadow-xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800 relative z-20 overflow-hidden">
-                            <ClockWidget token={token} />
+                            <ClockWidget token={token} initialData={activeEntry} />
                         </div>
 
                         {/* 2. PRODUCTIVITY METRICS */}

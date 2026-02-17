@@ -7,52 +7,28 @@ import { Loader2, TrendingUp, Clock } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { API_BASE_URL } from "@/lib/config"
 
-export default function AttendanceChart({ token }: { token: string }) {
-    const [chartData, setChartData] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-    const [stats, setStats] = useState({ total: 0, avg: 0 })
+export default function AttendanceChart({ token, initialData }: { token: string, initialData?: any }) {
+    const [chartData, setChartData] = useState<any[]>(initialData?.chartData || [])
+    const [loading, setLoading] = useState(!initialData)
+    const [stats, setStats] = useState({
+        total: initialData?.totalHours || 0,
+        avg: initialData ? Number((initialData.totalHours / 7).toFixed(1)) : 0
+    })
 
     useEffect(() => {
         const fetchStats = async () => {
+            if (initialData) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/time/history?limit=50`, {
+                const res = await fetch(`${API_BASE_URL}/time/summary`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
 
                 if (res.ok) {
-                    const history = await res.json()
-                    const dayMap: { [key: string]: number } = {}
-
-                    history.forEach((entry: any) => {
-                        const d = new Date(entry.clockIn)
-                        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                        dayMap[dateKey] = (dayMap[dateKey] || 0) + (entry.hoursWorked ? Number(entry.hoursWorked) : 0)
-                    })
-
-                    const daysOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                    const last7Days = []
-                    let totalHours = 0
-
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date()
-                        d.setDate(d.getDate() - i)
-                        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                        const dayName = daysOrder[d.getDay()]
-                        const hours = Number((dayMap[dateKey] || 0).toFixed(1))
-                        totalHours += hours
-
-                        last7Days.push({
-                            date: dateKey,
-                            day: dayName,
-                            fullDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                            hours: hours
-                        })
-                    }
-
-                    setChartData(last7Days)
+                    const data = await res.json()
+                    setChartData(data.chartData)
                     setStats({
-                        total: Number(totalHours.toFixed(1)),
-                        avg: Number((totalHours / 7).toFixed(1))
+                        total: data.totalHours,
+                        avg: Number((data.totalHours / 7).toFixed(1))
                     })
                 }
             } catch (e) {
@@ -62,7 +38,7 @@ export default function AttendanceChart({ token }: { token: string }) {
             }
         }
         if (token) fetchStats()
-    }, [token])
+    }, [token, initialData])
 
     if (loading) {
         return (

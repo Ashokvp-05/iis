@@ -25,6 +25,8 @@ router.patch('/settings', authorize(['ADMIN', 'SUPER_ADMIN']), adminController.u
 // Advanced User Control
 router.patch('/users/:id/status', authorize(['ADMIN', 'SUPER_ADMIN']), adminController.toggleUserStatus);
 router.patch('/users/:id/reset-password', authorize(['ADMIN', 'SUPER_ADMIN']), adminController.resetUserPassword);
+router.get('/users/:id/salary-config', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), adminController.getSalaryConfig);
+router.put('/users/:id/salary-config', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), adminController.updateSalaryConfig);
 router.delete('/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), adminController.deleteUser);
 
 export default router;

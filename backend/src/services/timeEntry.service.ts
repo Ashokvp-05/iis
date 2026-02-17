@@ -109,22 +109,37 @@ export const getSummary = async (userId: string) => {
     let daysWorked = new Set();
     let overtimeHours = 0; // Simple threshold > 9 hours per day
 
+    const dayMap: { [key: string]: number } = {};
     entries.forEach(entry => {
         const duration = entry.hoursWorked ? Number(entry.hoursWorked) : 0;
         totalHours += duration;
 
         const dayKey = entry.clockIn.toISOString().split('T')[0];
         daysWorked.add(dayKey);
+        dayMap[dayKey] = (dayMap[dayKey] || 0) + duration;
 
         if (duration > 9) {
             overtimeHours += (duration - 9);
         }
     });
 
+    const chartData = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateKey = d.toISOString().split('T')[0];
+        chartData.push({
+            date: dateKey,
+            day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()],
+            hours: Number((dayMap[dateKey] || 0).toFixed(1))
+        });
+    }
+
     return {
         totalHours: totalHours.toFixed(2),
         overtimeHours: overtimeHours.toFixed(2),
-        daysWorked: daysWorked.size
+        daysWorked: daysWorked.size,
+        chartData
     };
 };
 

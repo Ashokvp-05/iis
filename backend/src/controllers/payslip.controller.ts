@@ -93,7 +93,7 @@ export const releasePayslip = async (req: Request, res: Response) => {
 
 export const generatePayslip = async (req: Request, res: Response) => {
     try {
-        const { userId, month, year, amount } = req.body;
+        const { userId, month, year, amount, hra, da, bonus, otherAllowances, pf, tax } = req.body;
 
         if (!userId || !month || !year || !amount) {
             return res.status(400).json({ error: "Missing required fields" });
@@ -103,7 +103,15 @@ export const generatePayslip = async (req: Request, res: Response) => {
             userId,
             month,
             parseInt(year),
-            parseFloat(amount)
+            parseFloat(amount),
+            {
+                hra: hra ? parseFloat(hra) : 0,
+                da: da ? parseFloat(da) : 0,
+                bonus: bonus ? parseFloat(bonus) : 0,
+                otherAllowances: otherAllowances ? parseFloat(otherAllowances) : 0,
+                pf: pf ? parseFloat(pf) : 0,
+                tax: tax ? parseFloat(tax) : 0
+            }
         );
 
         const adminId = (req as any).user.id;

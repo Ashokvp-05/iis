@@ -11,10 +11,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from "@/components/ui/skeleton"
 import { API_BASE_URL } from "@/lib/config"
 
-export default function ClockWidget({ token }: { token: string }) {
-    const [loading, setLoading] = useState(true)
+export default function ClockWidget({ token, initialData }: { token: string, initialData?: any }) {
+    const [loading, setLoading] = useState(!initialData)
     const [actionLoading, setActionLoading] = useState(false)
-    const [activeEntry, setActiveEntry] = useState<any>(null)
+    const [activeEntry, setActiveEntry] = useState<any>(initialData || null)
     const [clockType, setClockType] = useState("IN_OFFICE")
     const [isOnCall, setIsOnCall] = useState(false)
     const [elapsedTime, setElapsedTime] = useState(0)
@@ -22,8 +22,10 @@ export default function ClockWidget({ token }: { token: string }) {
     const [showOvertimeModal, setShowOvertimeModal] = useState(false)
 
     useEffect(() => {
-        fetchActiveEntry()
-    }, [])
+        if (!initialData) {
+            fetchActiveEntry()
+        }
+    }, [initialData])
 
     useEffect(() => {
         let interval: NodeJS.Timeout

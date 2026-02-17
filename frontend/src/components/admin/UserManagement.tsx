@@ -111,6 +111,19 @@ export default function UserManagement({ token }: { token: string }) {
         discordId: ""
     })
 
+    // Salary Config State
+    const [salaryOpen, setSalaryOpen] = useState(false)
+    const [salaryLoading, setSalaryLoading] = useState(false)
+    const [salaryForm, setSalaryForm] = useState({
+        basicSalary: "0",
+        hra: "0",
+        da: "0",
+        bonus: "0",
+        pf: "0",
+        tax: "0",
+        otherAllowances: "0"
+    })
+
     const router = useRouter()
 
     const handleEditClick = (user: User) => {
@@ -126,6 +139,61 @@ export default function UserManagement({ token }: { token: string }) {
             discordId: user.discordId || ""
         })
         setEditOpen(true)
+    }
+
+    const handleSalaryClick = async (user: User) => {
+        setSelectedUser(user)
+        setSalaryLoading(true)
+        setSalaryOpen(true)
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/users/${user.id}/salary-config`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setSalaryForm({
+                    basicSalary: data.basicSalary.toString(),
+                    hra: data.hra.toString(),
+                    da: data.da.toString(),
+                    bonus: data.bonus.toString(),
+                    pf: data.pf.toString(),
+                    tax: data.tax.toString(),
+                    otherAllowances: data.otherAllowances.toString()
+                })
+            }
+        } catch (err) {
+            toast({ title: "Error", description: "Failed to fetch salary data", variant: "destructive" })
+        } finally {
+            setSalaryLoading(false)
+        }
+    }
+
+    const handleUpdateSalary = async () => {
+        if (!selectedUser) return
+        try {
+            const res = await fetch(`${API_BASE_URL}/admin/users/${selectedUser.id}/salary-config`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    basicSalary: parseFloat(salaryForm.basicSalary),
+                    hra: parseFloat(salaryForm.hra),
+                    da: parseFloat(salaryForm.da),
+                    bonus: parseFloat(salaryForm.bonus),
+                    pf: parseFloat(salaryForm.pf),
+                    tax: parseFloat(salaryForm.tax),
+                    otherAllowances: parseFloat(salaryForm.otherAllowances)
+                })
+            })
+            if (res.ok) {
+                toast({ title: "Success", description: "Salary configuration permanently updated." })
+                setSalaryOpen(false)
+            }
+        } catch (err) {
+            toast({ title: "Error", description: "Operation failed", variant: "destructive" })
+        }
     }
 
     const handleUpdateUser = async () => {
@@ -538,6 +606,13 @@ export default function UserManagement({ token }: { token: string }) {
                                                 View Timelogs
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
+                                                className="gap-2 focus:bg-indigo-50 focus:text-indigo-600 cursor-pointer"
+                                                onClick={() => handleSalaryClick(user)}
+                                            >
+                                                <Shield className="w-4 h-4" />
+                                                Financial Config
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
                                                 className="gap-2 text-rose-600 focus:bg-rose-50 focus:text-rose-600 cursor-pointer"
                                                 onClick={() => handleDeactivate(user.id)}
                                             >
@@ -664,6 +739,62 @@ export default function UserManagement({ token }: { token: string }) {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditOpen(false)}>Discard</Button>
                         <Button onClick={handleUpdateUser} className="bg-indigo-600 hover:bg-indigo-700">Apply Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Salary Config Dialog */}
+            <Dialog open={salaryOpen} onOpenChange={setSalaryOpen}>
+                <DialogContent className="sm:max-w-[450px] border-0 shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-bold">Financial Structure</DialogTitle>
+                        <DialogDescription>
+                            Configure the permanent pay architecture for {selectedUser?.name}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {salaryLoading ? (
+                        <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-500" /></div>
+                    ) : (
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Basic Monthly Salary</label>
+                                <Input type="number" value={salaryForm.basicSalary} onChange={(e) => setSalaryForm({ ...salaryForm, basicSalary: e.target.value })} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">HRA</label>
+                                    <Input type="number" value={salaryForm.hra} onChange={(e) => setSalaryForm({ ...salaryForm, hra: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">DA</label>
+                                    <Input type="number" value={salaryForm.da} onChange={(e) => setSalaryForm({ ...salaryForm, da: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Standard Bonus</label>
+                                    <Input type="number" value={salaryForm.bonus} onChange={(e) => setSalaryForm({ ...salaryForm, bonus: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Other Allowances</label>
+                                    <Input type="number" value={salaryForm.otherAllowances} onChange={(e) => setSalaryForm({ ...salaryForm, otherAllowances: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-rose-500 uppercase">Monthly PF</label>
+                                    <Input type="number" className="border-rose-100" value={salaryForm.pf} onChange={(e) => setSalaryForm({ ...salaryForm, pf: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-rose-500 uppercase">Income Tax (TDS)</label>
+                                    <Input type="number" className="border-rose-100" value={salaryForm.tax} onChange={(e) => setSalaryForm({ ...salaryForm, tax: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSalaryOpen(false)}>Cancel</Button>
+                        <Button onClick={handleUpdateSalary} className="bg-slate-900 hover:bg-black text-white px-8">Save Architecture</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

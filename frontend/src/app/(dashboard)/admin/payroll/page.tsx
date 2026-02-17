@@ -44,6 +44,17 @@ export default function PayrollPage() {
     const [searchQuery, setSearchQuery] = useState("")
     const [bulkReleasing, setBulkReleasing] = useState(false)
 
+    // Breakdown state
+    const [breakdown, setBreakdown] = useState({
+        hra: "",
+        da: "",
+        bonus: "",
+        otherAllowances: "",
+        pf: "",
+        tax: ""
+    })
+    const [showAdvanced, setShowAdvanced] = useState(false)
+
     // Batch State
     const [creatingBatch, setCreatingBatch] = useState(false)
     const [showCreateBatchModal, setShowCreateBatchModal] = useState(false)
@@ -156,15 +167,22 @@ export default function PayrollPage() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify({ userId: selectedUser, month, year, amount })
+                body: JSON.stringify({
+                    userId: selectedUser,
+                    month,
+                    year,
+                    amount,
+                    ...breakdown
+                })
             })
 
             if (!res.ok) throw new Error("Generation failed")
 
             const newPayslip = await res.json()
             setPayslips([newPayslip, ...payslips])
-            toast.success("Payslip generated from system template")
+            toast.success("Payslip generated with customized breakdown")
             setAmount("")
+            setBreakdown({ hra: "", da: "", bonus: "", otherAllowances: "", pf: "", tax: "" })
         } catch (error: any) {
             toast.error(error.message || "Generation failed")
         } finally {
@@ -191,12 +209,12 @@ export default function PayrollPage() {
     }
 
     const handleBulkRelease = async () => {
-        const generatedSlips = payslips.filter(s => s.status === 'GENERATED')
+        const generatedSlips = payslips.filter(s => s.status === 'DRAFT')
         if (generatedSlips.length === 0) {
-            toast.error("No generated payslips to release")
+            toast.error("No draft payslips to release")
             return
         }
-        if (!confirm(`Are you sure you want to release all ${generatedSlips.length} generated payslips?`)) return
+        if (!confirm(`Are you sure you want to release all ${generatedSlips.length} draft payslips?`)) return
 
         setBulkReleasing(true)
         try {
@@ -478,6 +496,46 @@ export default function PayrollPage() {
                                         <Label>Payslip PDF (Optional)</Label>
                                         <Input type="file" accept=".pdf" onChange={handleFileChange} />
                                     </div>
+                                    <div className="pt-2">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setShowAdvanced(!showAdvanced)}
+                                            className="w-full text-[10px] font-black uppercase tracking-tighter text-slate-400 hover:text-indigo-600 mb-2"
+                                        >
+                                            {showAdvanced ? "Hide Individual Breakdown" : "Edit Detailed Breakdown"}
+                                        </Button>
+
+                                        {showAdvanced && (
+                                            <div className="grid grid-cols-2 gap-3 mb-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] uppercase font-bold text-slate-400">HRA</Label>
+                                                    <Input type="number" placeholder="0" value={breakdown.hra} onChange={(e) => setBreakdown({ ...breakdown, hra: e.target.value })} className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] uppercase font-bold text-slate-400">DA</Label>
+                                                    <Input type="number" placeholder="0" value={breakdown.da} onChange={(e) => setBreakdown({ ...breakdown, da: e.target.value })} className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] uppercase font-bold text-slate-400">Bonus</Label>
+                                                    <Input type="number" placeholder="0" value={breakdown.bonus} onChange={(e) => setBreakdown({ ...breakdown, bonus: e.target.value })} className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] uppercase font-bold text-slate-400">Allowances</Label>
+                                                    <Input type="number" placeholder="0" value={breakdown.otherAllowances} onChange={(e) => setBreakdown({ ...breakdown, otherAllowances: e.target.value })} className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] uppercase font-bold text-slate-400 text-rose-500">PF (-)</Label>
+                                                    <Input type="number" placeholder="0" value={breakdown.pf} onChange={(e) => setBreakdown({ ...breakdown, pf: e.target.value })} className="h-8 text-xs border-rose-100 dark:border-rose-900/30 bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] uppercase font-bold text-slate-400 text-rose-500">Tax (-)</Label>
+                                                    <Input type="number" placeholder="0" value={breakdown.tax} onChange={(e) => setBreakdown({ ...breakdown, tax: e.target.value })} className="h-8 text-xs border-rose-100 dark:border-rose-900/30 bg-white dark:bg-slate-900" />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="pt-4 space-y-3">
                                         <Button type="submit" className="w-full bg-slate-900 text-white font-black uppercase tracking-widest h-12 rounded-xl" disabled={uploading || !file}>
                                             {uploading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <UploadCloud className="mr-2 h-4 w-4" />} Manual Upload
@@ -516,8 +574,18 @@ export default function PayrollPage() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <Badge variant="outline">{slip.status}</Badge>
-                                                {slip.status === 'GENERATED' && <Button size="sm" variant="outline" onClick={() => handleRelease(slip.id)}>Release</Button>}
+                                                <Badge className={`rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-tighter ${slip.status === 'RELEASED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                    {slip.status}
+                                                </Badge>
+                                                {slip.status === 'DRAFT' && (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => handleRelease(slip.id)}
+                                                        className="h-8 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest px-4 shadow-lg shadow-indigo-200"
+                                                    >
+                                                        <Send className="w-3 h-3 mr-1.5" /> Release
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

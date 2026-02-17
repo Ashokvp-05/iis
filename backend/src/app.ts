@@ -14,6 +14,7 @@ app.set('etag', false); // Disable etag for simpler debugging
 const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'http://[::1]:3000',
     process.env.FRONTEND_URL,
     process.env.NEXT_PUBLIC_FRONTEND_URL,
 ].filter(Boolean);
@@ -91,6 +92,7 @@ import aiRoutes from './routes/ai.routes';
 import payslipRoutes from './routes/payslip.routes';
 import payrollRoutes from './routes/payroll.routes';
 import workflowRoutes from './routes/workflow.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import { initCronJobs } from './services/cron.service';
 
 // Initialize Scheduled Tasks
@@ -113,6 +115,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/payslips', payslipRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/workflows', workflowRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // 404 Handler - must be after all routes
 app.use((req, res) => {

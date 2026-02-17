@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserStatus } from '@prisma/client';
 import prisma from '../config/db';
+import cache from '../config/cache';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
@@ -27,11 +28,18 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
 
-        // --- TOKEN VERSION CHECK (FOR LOGOUT OTHER DEVICES) ---
-        const user = await prisma.user.findUnique({
-            where: { id: decoded.id },
-            select: { tokenVersion: true, status: true } as any
-        }) as any;
+        // --- CACHED USER & CONFIG CHECK ---
+        const cacheKeyUser = `auth_user_${decoded.id}`;
+        const cacheKeyLockdown = `system_lockdown`;
+
+        let user = cache.get(cacheKeyUser) as any;
+        if (!user) {
+            user = await prisma.user.findUnique({
+                where: { id: decoded.id },
+                select: { tokenVersion: true, status: true }
+            });
+            if (user) cache.set(cacheKeyUser, user, 30); // Cache for 30s
+        }
 
         if (!user || user.tokenVersion !== decoded.tokenVersion) {
             return res.status(401).json({ error: 'Session expired or invalidated' });
@@ -39,24 +47,27 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
         req.user = decoded;
 
-        // --- LOCKDOWN CHECK ---
-        const lockdownConfig = await prisma.systemConfig.findUnique({
-            where: { key: 'lockdownMode' }
-        });
+        // --- CACHED LOCKDOWN CHECK ---
+        let isLockdown = cache.get(cacheKeyLockdown);
+        if (isLockdown === undefined) {
+            const lockdownConfig = await prisma.systemConfig.findUnique({
+                where: { key: 'lockdownMode' }
+            });
+            isLockdown = lockdownConfig?.value === true;
+            cache.set(cacheKeyLockdown, isLockdown, 300); // Cache for 5 mins
+        }
 
-        const isLockdown = lockdownConfig?.value === true;
         const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(decoded.role || '');
 
         if (isLockdown && !isAdmin) {
             return res.status(503).json({
                 error: 'System In Lockdown',
-                message: 'Terminal access restricted by command authority. Please contact security.'
+                message: 'Terminal access restricted by command authority.'
             });
         }
 
         // Check if user is active
-        const status = user.status as string;
-        if (status !== 'ACTIVE' && status !== 'PENDING') {
+        if (user.status !== 'ACTIVE' && user.status !== 'PENDING') {
             return res.status(403).json({ error: 'Account is not active' });
         }
 

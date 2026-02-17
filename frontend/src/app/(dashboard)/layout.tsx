@@ -37,6 +37,7 @@ export default async function DashboardLayout({
                                     src="/logo.png"
                                     alt="Rudratic"
                                     fill
+                                    sizes="36px"
                                     className="object-contain"
                                 />
                             </div>
