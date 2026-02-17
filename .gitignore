@@ -27,8 +27,8 @@ Thumbs.db
 !.env.example
 
 # Prisma
-hr-management/backend/prisma/migrations/*.sql
-hr-management/backend/prisma/dev.db
+backend/prisma/migrations/*.sql
+backend/prisma/dev.db
 
 # Logs & Temp
 npm-debug.log*
@@ -47,9 +47,9 @@ package-lock.json.backup
 .netlify
 
 # Project Specific
-hr-management/backend/uploads/
-hr-management/backend/backend.log
-hr-management/frontend/next-env.d.ts
+backend/uploads/
+backend/backend.log
+frontend/next-env.d.ts
 project_code_snapshot.zip
 frontend_codebase_dump.txt
 local_pg_data/

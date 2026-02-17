@@ -13,14 +13,14 @@ A high-performance, professional-grade Human Resources Management System. This p
 
 The project is organized into two primary services:
 
-### 1. **Backend API** (`/hr-management/backend`)
+### 1. **Backend API** (`/backend`)
 The engine of the system.
 - **Language**: TypeScript / Node.js
 - **Framework**: Express.js
 - **Database**: PostgreSQL with Prisma ORM
 - **Key Folders**: `controllers`, `routes`, `services`, `prisma`.
 
-### 2. **Frontend UI** (`/hr-management/frontend`)
+### 2. **Frontend UI** (`/frontend`)
 The premium user interface.
 - **Framework**: Next.js 16 (App Router)
 - **Styling**: Tailwind CSS 4
@@ -38,22 +38,22 @@ The premium user interface.
 ### 2. Local Installation
 ```bash
 # Clone the repository
-git clone https://github.com/Ashokvp-05/hr-management-system.git
+git clone https://github.com/Ashokvp-05/hr-management-module-1-.git
 
 # Install & Run Backend
-cd hr-management/backend
+cd backend
 npm install
 npm run dev
 
 # Install & Run Frontend (In a new terminal)
-cd hr-management/frontend
+cd frontend
 npm install
 npm run dev
 ```
 
 ### 3. Database Sync
 ```bash
-cd hr-management/backend
+cd backend
 npx prisma generate
 npx prisma migrate dev
 ```
@@ -72,7 +72,7 @@ npx prisma migrate dev
 
 ## 🌐 Production Deployment
 This system is designed for **Render.com** deployment.
-- **Deployment File**: `hr-management/render.yaml`
+- **Deployment File**: `render.yaml`
 - **Database Recommendation**: [Supabase](https://supabase.com) (PostgreSQL)
 
 ---
