@@ -12,7 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown, ShieldCheck, UserCog } from "lucide-react"
+import { ChevronDown, ShieldCheck, UserCog, Briefcase } from "lucide-react"
 
 import { getDashboardByRole } from "@/lib/role-redirect"
 
@@ -34,6 +34,25 @@ const adminItems = [
     { name: "Holidays", href: "/admin/holidays" },
     { name: "Audit Logs", href: "/admin/audit-logs" },
     { name: "Settings", href: "/admin/settings" },
+]
+
+const managerItems = [
+    { name: "Overview", href: "/manager" },
+    { name: "Team", href: "/admin/users" },
+    { name: "Leaves", href: "/admin/leaves" },
+    { name: "Team Reports", href: "/manager/reports" },
+    { name: "Announcements", href: "/admin/announcements" },
+]
+
+const hrItems = [
+    { name: "HR Dashboard", href: "/hr" },
+    { name: "Onboarding", href: "/hr/onboarding" },
+    { name: "Recruitment (ATS)", href: "/hr/recruitment" },
+    { name: "Compliance Hub", href: "/hr/compliance" },
+    { name: "Learning Portal", href: "/hr/learning" },
+    { name: "Asset Inventory", href: "/hr/assets" },
+    { name: "Performance Hub", href: "/performance" },
+    { name: "Payroll Center", href: "/admin/payroll" },
 ]
 
 export default function Navbar({ role }: { role?: string }) {
@@ -68,25 +87,21 @@ export default function Navbar({ role }: { role?: string }) {
         )
     }
 
-    const managerItems = [
-        { name: "Overview", href: "/manager" },
-        { name: "Team", href: "/admin/users" },
-        { name: "Leaves", href: "/admin/leaves" },
-        { name: "Team Reports", href: "/manager/reports" },
-        { name: "Announcements", href: "/admin/announcements" },
-    ]
-
     const getSecondaryItems = () => {
         const normalizedRole = role?.toUpperCase()
         if (!normalizedRole) return []
         if (['ADMIN', 'SUPER_ADMIN'].includes(normalizedRole)) return adminItems
         if (normalizedRole === 'MANAGER') return managerItems
+        if (normalizedRole === 'HR' || normalizedRole === 'HR_ADMIN') return hrItems
         return []
     }
 
     const secondaryItems = getSecondaryItems()
     const isManagerOrAdmin = secondaryItems.length > 0
-    const label = role?.toUpperCase() === 'MANAGER' ? 'Manager' : 'Admin'
+    let label = 'Admin'
+    const normalizedRole = role?.toUpperCase()
+    if (normalizedRole === 'MANAGER') label = 'Manager'
+    if (normalizedRole === 'HR' || normalizedRole === 'HR_ADMIN') label = 'HR Portal'
 
     return (
         <nav className="flex items-center space-x-1">
@@ -98,14 +113,14 @@ export default function Navbar({ role }: { role?: string }) {
 
                     <DropdownMenu>
                         <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors outline-none ring-offset-2 focus:ring-2 ring-indigo-500">
-                            {role?.toUpperCase() === 'MANAGER' ? <UserCog className="w-4 h-4 text-indigo-600" /> : <ShieldCheck className="w-4 h-4 text-indigo-600" />}
+                            {normalizedRole === 'MANAGER' ? <UserCog className="w-4 h-4 text-indigo-600" /> : normalizedRole?.includes('HR') ? <Briefcase className="w-4 h-4 text-indigo-600" /> : <ShieldCheck className="w-4 h-4 text-indigo-600" />}
                             <span>{label}</span>
                             <ChevronDown className="w-3 h-3 text-slate-400" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel>Management Tools</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            {secondaryItems.map((item) => (
+                            {secondaryItems.map((item: any) => (
                                 <DropdownMenuItem key={item.href} asChild>
                                     <Link href={item.href} className={cn("cursor-pointer w-full", pathname === item.href && "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400")}>
                                         {item.name}

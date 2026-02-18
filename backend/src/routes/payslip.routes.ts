@@ -14,14 +14,14 @@ router.get('/:id/download', payslipController.downloadPayslip);
 
 // Admin / Manager actions
 // Allow broad access for basic listing, specific actions guarded below
-router.get('/all', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'MANAGER']), payslipController.getAllPayslips);
+router.get('/all', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR', 'MANAGER']), payslipController.getAllPayslips);
 
 // Admin Only
-router.post('/upload', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), upload.single('file'), payslipController.uploadPayslip);
-router.post('/generate', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), payslipController.generatePayslip);
-router.patch('/:id/release', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), payslipController.releasePayslip);
-router.post('/bulk-release', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), payslipController.bulkRelease);
-router.delete('/:id', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), payslipController.deletePayslip);
-router.put('/:id', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN']), payslipController.updatePayslip);
+router.post('/upload', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR']), upload.single('file'), payslipController.uploadPayslip);
+router.post('/generate', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR']), payslipController.generatePayslip);
+router.patch('/:id/release', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR']), payslipController.releasePayslip);
+router.post('/bulk-release', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR']), payslipController.bulkRelease);
+router.delete('/:id', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR']), payslipController.deletePayslip);
+router.put('/:id', authorize(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR']), payslipController.updatePayslip);
 
 export default router;

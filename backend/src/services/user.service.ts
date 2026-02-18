@@ -1,23 +1,56 @@
 import prisma from '../config/db';
 
-export const getAllUsers = async () => {
-    return prisma.user.findMany({
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            roleId: true,
-            role: {
-                select: { name: true }
+export const getAllUsers = async (query: { page?: number; limit?: number; search?: string; status?: string }) => {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query.status && query.status !== 'ALL') {
+        where.status = query.status;
+    }
+    if (query.search) {
+        where.OR = [
+            { name: { contains: query.search, mode: 'insensitive' } },
+            { email: { contains: query.search, mode: 'insensitive' } },
+            { department: { contains: query.search, mode: 'insensitive' } },
+            { designation: { contains: query.search, mode: 'insensitive' } }
+        ];
+    }
+
+    const [users, total] = await Promise.all([
+        prisma.user.findMany({
+            where,
+            skip,
+            take: limit,
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                roleId: true,
+                role: {
+                    select: { name: true }
+                },
+                department: true,
+                designation: true,
+                joiningDate: true,
+                status: true,
+                createdAt: true
             },
-            department: true,
-            designation: true,
-            joiningDate: true,
-            status: true,
-            createdAt: true
-        },
-        orderBy: { createdAt: 'desc' }
-    });
+            orderBy: { createdAt: 'desc' }
+        }),
+        prisma.user.count({ where })
+    ]);
+
+    return {
+        users,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
 };
 
 export const updateUser = async (userId: string, data: any) => {

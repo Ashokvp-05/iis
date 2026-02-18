@@ -9,8 +9,8 @@ router.use(authenticate);
 router.post('/request', leaveController.createRequest);
 router.get('/my-requests', leaveController.getMyRequests);
 router.get('/balance', leaveController.getBalance);
-router.get('/all', requireRole(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'OPS_ADMIN', 'VIEWER_ADMIN', 'MANAGER']), leaveController.getAllRequests);
-router.put('/:id/approve', requireRole(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'OPS_ADMIN', 'MANAGER']), leaveController.approveRequest);
-router.put('/:id/reject', requireRole(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'OPS_ADMIN', 'MANAGER']), leaveController.rejectRequest);
+router.get('/all', requireRole(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR', 'OPS_ADMIN', 'VIEWER_ADMIN', 'MANAGER']), leaveController.getAllRequests);
+router.put('/:id/approve', requireRole(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR', 'OPS_ADMIN', 'MANAGER']), leaveController.approveRequest);
+router.put('/:id/reject', requireRole(['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR', 'OPS_ADMIN', 'MANAGER']), leaveController.rejectRequest);
 
 export default router;

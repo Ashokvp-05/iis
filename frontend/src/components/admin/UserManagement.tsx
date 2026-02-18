@@ -81,7 +81,11 @@ export default function UserManagement({ token }: { token: string }) {
     const [roles, setRoles] = useState<Role[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState("ALL")
+    const [page, setPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
+    const [totalUsers, setTotalUsers] = useState(0)
     const { toast } = useToast()
 
     // Add User Form State
@@ -259,14 +263,33 @@ export default function UserManagement({ token }: { token: string }) {
     }
 
     useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm)
+            setPage(1) // Reset page on search
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [searchTerm])
+
+    useEffect(() => {
+        setPage(1) // Reset page on filter
+    }, [statusFilter])
+
+    useEffect(() => {
         fetchInitialData()
-    }, [token])
+    }, [token, debouncedSearch, statusFilter, page])
 
     const fetchInitialData = async () => {
         setLoading(true)
         try {
+            const queryParams = new URLSearchParams({
+                page: page.toString(),
+                limit: "10",
+                search: debouncedSearch,
+                status: statusFilter
+            })
+
             const [usersRes, rolesRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/users`, {
+                fetch(`${API_BASE_URL}/users?${queryParams}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
                 fetch(`${API_BASE_URL}/admin/roles`, {
@@ -275,7 +298,10 @@ export default function UserManagement({ token }: { token: string }) {
             ])
 
             if (usersRes.ok) {
-                setUsers(await usersRes.json())
+                const data = await usersRes.json()
+                setUsers(data.users)
+                setTotalPages(data.pagination.totalPages)
+                setTotalUsers(data.pagination.total)
             } else {
                 toast({ title: "Access Denied", description: "You don't have permission to view the user registry.", variant: "destructive" })
             }
@@ -343,13 +369,6 @@ export default function UserManagement({ token }: { token: string }) {
         }
     }
 
-    const filteredUsers = users.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchTerm.toLowerCase())
-        const matchesStatus = statusFilter === "ALL" || user.status === statusFilter
-        return matchesSearch && matchesStatus
-    })
-
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'ACTIVE': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
@@ -363,7 +382,7 @@ export default function UserManagement({ token }: { token: string }) {
         const headers = ["Name", "Email", "Role", "Department", "Designation", "Phone", "Status", "Joined"]
         const csvContent = [
             headers.join(","),
-            ...filteredUsers.map(u => [
+            ...users.map(u => [
                 `"${u.name}"`,
                 `"${u.email}"`,
                 `"${u.role?.name || ''}"`,
@@ -540,7 +559,7 @@ export default function UserManagement({ token }: { token: string }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredUsers.map((user) => (
+                        {users.map((user) => (
                             <TableRow key={user.id} className="group border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                 <TableCell className="pl-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -627,7 +646,7 @@ export default function UserManagement({ token }: { token: string }) {
                     </TableBody>
                 </Table>
 
-                {filteredUsers.length === 0 && (
+                {users.length === 0 && (
                     <div className="p-20 text-center flex flex-col items-center gap-4">
                         <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-full">
                             <Search className="w-8 h-8 text-slate-300" />
@@ -642,6 +661,48 @@ export default function UserManagement({ token }: { token: string }) {
                     </div>
                 )}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-2 py-4">
+                    <p className="text-sm text-slate-500 font-medium italic">
+                        Showing page <span className="text-indigo-600 font-bold">{page}</span> of <span className="font-bold">{totalPages}</span> — Total <span className="font-bold">{totalUsers}</span> personnel
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={page === 1}
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            className="rounded-xl"
+                        >
+                            Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                                <Button
+                                    key={p}
+                                    variant={page === p ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setPage(p)}
+                                    className={`w-9 h-9 rounded-xl ${page === p ? 'bg-indigo-600 shadow-lg shadow-indigo-500/20' : ''}`}
+                                >
+                                    {p}
+                                </Button>
+                            ))}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={page === totalPages}
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            className="rounded-xl"
+                        >
+                            Next
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Edit User Dialog */}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>

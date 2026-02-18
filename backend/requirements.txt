@@ -1,0 +1,15 @@
+# RUDRATIC HR SYSTEM REQUIREMENTS
+# --------------------------------
+# For automated installation of all dependencies:
+# Run 'setup.bat' on Windows or 'npm run install-all' on any OS.
+
+# SOFTWARE PREREQUISITES:
+Node.js >= 18.0.0
+PostgreSQL >= 14.0.0
+npm >= 9.0.0
+
+# SERVICES:
+- Express.js (Backend)
+- Next.js 16 (Frontend)
+- Prisma (ORM)
+- Supabase (Storage)

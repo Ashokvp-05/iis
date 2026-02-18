@@ -14,7 +14,8 @@ const registerSchema = z.object({
     roleId: z.string().optional(),
     roleName: z.string().optional(), // Added roleName support
     department: z.string().optional(),
-    designation: z.string().optional()
+    designation: z.string().optional(),
+    joiningDate: z.string().optional() // New field
 });
 
 const loginSchema = z.object({
@@ -23,7 +24,7 @@ const loginSchema = z.object({
 });
 
 export const requestRegistration = async (data: z.infer<typeof registerSchema>) => {
-    const { email, password, name, roleId, roleName, department, designation } = registerSchema.parse(data);
+    const { email, password, name, roleId, roleName, department, designation, joiningDate } = registerSchema.parse(data);
 
     const existingUser = await prisma.user.findUnique({
         where: { email },
@@ -64,7 +65,8 @@ export const requestRegistration = async (data: z.infer<typeof registerSchema>) 
             status: UserStatus.ACTIVE,
             roleId: finalRoleId,
             department,
-            designation
+            designation,
+            joiningDate: joiningDate ? new Date(joiningDate) : undefined
         },
     });
 

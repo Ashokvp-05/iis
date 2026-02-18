@@ -30,7 +30,7 @@ import { PendingUser, PendingLeave, PendingPayslip } from "@/types/admin"
 export default async function AdminDashboardPage() {
     const session = await auth()
 
-    const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'OPS_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_ADMIN', 'VIEWER_ADMIN', 'MANAGER']
+    const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HR_ADMIN', 'HR', 'OPS_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_ADMIN', 'VIEWER_ADMIN', 'MANAGER']
     const role = (session?.user?.role || "USER").toUpperCase()
 
     if (!session || !ADMIN_ROLES.includes(role)) {

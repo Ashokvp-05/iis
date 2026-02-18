@@ -3,8 +3,14 @@ import * as userService from '../services/user.service';
 
 export const getUsers = async (req: Request, res: Response) => {
     try {
-        const users = await userService.getAllUsers();
-        res.json(users);
+        const { page, limit, search, status } = req.query;
+        const result = await userService.getAllUsers({
+            page: page ? parseInt(page as string) : undefined,
+            limit: limit ? parseInt(limit as string) : undefined,
+            search: search as string,
+            status: status as string
+        });
+        res.json(result);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

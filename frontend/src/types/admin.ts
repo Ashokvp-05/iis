@@ -6,6 +6,7 @@ export interface PendingUser {
     role?: string | { name: string };
     status?: string;
     department?: string;
+    designation?: string;
 }
 
 export interface PendingLeave {

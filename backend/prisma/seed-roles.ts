@@ -27,6 +27,17 @@ const ROLES = [
         }
     },
     {
+        name: 'HR',
+        permissions: {
+            canManageUsers: true,
+            canApproveLeaves: true,
+            canEditAttendance: true,
+            canExportReports: true,
+            canConfigureSystem: false,
+            canViewAuditLogs: false
+        }
+    },
+    {
         name: 'OPS_ADMIN', // Operations
         permissions: {
             canManageUsers: false,
