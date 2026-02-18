@@ -17,12 +17,9 @@ services:
           name: hr-database
           property: connectionString
       - key: JWT_SECRET
-        generateValue: true # Generates a secure random key automatically
+        generateValue: true
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: hr-frontend
-          property: url
+        sync: false # User will provide this in the dashboard
 
   # ---------------------------------------------------------------------------
   # 2. Frontend Web Service (Next.js)
@@ -36,22 +33,15 @@ services:
     startCommand: npm start
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: hr-backend
-          property: url
-          suffix: /api
+        sync: false # User will provide this in the dashboard
       - key: AUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
-        fromService:
-          type: web
-          name: hr-frontend
-          property: url
+        sync: false # User will provide this in the dashboard
       - key: AUTH_TRUST_HOST
         value: true
       - key: NODE_OPTIONS
-        value: --max-old-space-size=450 # Stay within Render Free Tier memory limits
+        value: --max-old-space-size=450
 
 # ---------------------------------------------------------------------------
 # 3. Managed PostgreSQL Database
@@ -59,4 +49,4 @@ services:
 databases:
   - name: hr-database
     plan: free
-    region: singapore # Change this to your preferred region
+    region: singapore
