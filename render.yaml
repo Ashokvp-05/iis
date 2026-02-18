@@ -1,0 +1,62 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Backend Web Service (Express API)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: hr-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hr-database
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true # Generates a secure random key automatically
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: hr-frontend
+          property: url
+
+  # ---------------------------------------------------------------------------
+  # 2. Frontend Web Service (Next.js)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: hr-frontend
+    env: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: hr-backend
+          property: url
+          suffix: /api
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        fromService:
+          type: web
+          name: hr-frontend
+          property: url
+      - key: AUTH_TRUST_HOST
+        value: true
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=450 # Stay within Render Free Tier memory limits
+
+# ---------------------------------------------------------------------------
+# 3. Managed PostgreSQL Database
+# ---------------------------------------------------------------------------
+databases:
+  - name: hr-database
+    plan: free
+    region: singapore # Change this to your preferred region
