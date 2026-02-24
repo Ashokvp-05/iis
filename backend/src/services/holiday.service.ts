@@ -65,3 +65,20 @@ export const getHolidays = async (year: number) => {
     cache.set(key, holidays, 86400); // 24 hours
     return holidays;
 };
+
+export const createHoliday = async (data: { name: string; date: Date; year: number; isFloater: boolean }) => {
+    const holiday = await prisma.holiday.create({
+        data
+    });
+    cache.del(`holidays_${data.year}`);
+    return holiday;
+};
+
+export const deleteHoliday = async (id: string) => {
+    const holiday = await prisma.holiday.findUnique({ where: { id } });
+    if (!holiday) return null;
+
+    await prisma.holiday.delete({ where: { id } });
+    cache.del(`holidays_${holiday.year}`);
+    return holiday;
+};

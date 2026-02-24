@@ -1,5 +1,9 @@
 import prisma from '../config/db';
+import bcrypt from 'bcryptjs';
+
+declare const process: any;
 import { UserStatus } from '@prisma/client';
+import cache from '../config/cache';
 
 export const getPendingUsers = async () => {
     return prisma.user.findMany({
@@ -8,13 +12,9 @@ export const getPendingUsers = async () => {
     });
 };
 
-// Helper to log admin actions (requires audit_logs table)
+// Helper to log admin actions
 async function logAdminAction(action: string, adminId: string | undefined, targetId: string, details?: string) {
-    // If adminId is missing (e.g. system action), handle gracefully or use a system ID
     if (!adminId) return;
-
-    // We need to use @ts-ignore or update the generated client to recognize 'auditLog' if not yet regenerated
-    // For now we assume prisma.auditLog exists
     try {
         await (prisma as any).auditLog.create({
             data: {
@@ -72,9 +72,17 @@ export const getDatabaseStats = async () => {
     };
 };
 
-export const getDashboardOverview = async () => {
+export const getDashboardOverview = async (managerId?: string) => {
+    const cacheKey = managerId ? `manager_overview_${managerId}` : 'admin_dashboard_overview';
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return cachedData;
+
     const now = new Date();
     const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+
+    // Dynamic scoping filter
+    const scopeFilter = managerId ? { managerId: managerId } : {};
+    const userScopeFilter = { ...scopeFilter, status: 'ACTIVE' as const };
 
     // Run all database queries in parallel for maximum speed
     const [
@@ -83,46 +91,66 @@ export const getDashboardOverview = async () => {
         pendingLeaves,
         pendingUsers,
         recentActivity,
-        incompleteProfiles
+        incompleteProfiles,
+        managerInfo
     ] = await Promise.all([
-        prisma.user.count({ where: { status: 'ACTIVE' } }),
-        prisma.timeEntry.findMany({
-            where: { status: 'ACTIVE', clockOut: null },
+        (prisma.user as any).count({ where: userScopeFilter }),
+        (prisma.timeEntry as any).findMany({
+            where: {
+                status: 'ACTIVE',
+                clockOut: null,
+                user: scopeFilter
+            },
             select: {
                 id: true,
                 clockType: true,
                 clockIn: true,
-                user: { select: { id: true, name: true, department: true } }
+                user: { select: { id: true, name: true, department: true, managerId: true } }
             }
         }),
-        prisma.leaveRequest.count({ where: { status: 'PENDING' } }),
-        prisma.user.count({ where: { status: UserStatus.PENDING } }),
+        (prisma.leaveRequest as any).count({
+            where: {
+                status: 'PENDING',
+                user: scopeFilter
+            }
+        }),
+        (prisma.user as any).count({
+            where: {
+                status: UserStatus.PENDING,
+                managerId: managerId // If manager, only show their pending invites
+            }
+        }),
         (prisma as any).auditLog.findMany({
+            where: managerId ? { targetId: managerId } : {}, // Or filter by team activity
             take: 5,
             orderBy: { createdAt: 'desc' },
         }).catch(() => []),
-        prisma.user.count({
+        (prisma.user as any).count({
             where: {
+                ...scopeFilter,
                 OR: [{ phone: null }, { designation: null }, { department: null }],
                 status: 'ACTIVE'
             }
-        })
+        }),
+        managerId ? prisma.user.findUnique({ where: { id: managerId }, select: { department: true } }) : null
     ]);
 
+    const teamName = (managerInfo as any)?.department ? `${(managerInfo as any).department} Team` : "Global Command";
+
     const clockedInCount = activeSessions.length;
-    const remoteCount = activeSessions.filter(s => s.clockType === 'REMOTE').length;
-    const officeCount = activeSessions.filter(s => s.clockType === 'IN_OFFICE').length;
+    const remoteCount = activeSessions.filter((s: any) => s.clockType === 'REMOTE').length;
+    const officeCount = activeSessions.filter((s: any) => s.clockType === 'IN_OFFICE').length;
     const attendanceRate = totalActiveUsers > 0 ? (clockedInCount / totalActiveUsers) * 100 : 0;
 
     // Process alerts
     const alerts = [];
-    const longRunningSessions = activeSessions.filter(s => new Date(s.clockIn) < twelveHoursAgo);
+    const longRunningSessions = activeSessions.filter((s: any) => new Date(s.clockIn) < twelveHoursAgo);
 
     if (longRunningSessions.length > 0) {
         alerts.push({
             type: 'warning',
             message: `${longRunningSessions.length} users worked >12 hours`,
-            details: longRunningSessions.map(s => s.user.name).join(', ')
+            details: longRunningSessions.map((s: any) => (s as any).user.name).join(', ')
         });
     }
 
@@ -131,35 +159,39 @@ export const getDashboardOverview = async () => {
     }
 
     const remoteUsers = activeSessions
-        .map(s => ({
-            id: s.user.id,
-            name: s.user.name,
+        .map((s: any) => ({
+            id: (s as any).user.id,
+            name: (s as any).user.name,
             status: (s.clockType === 'REMOTE' ? 'REMOTE' : 'ONLINE') as any,
             clockIn: s.clockIn,
             location: (s as any).location?.city || (s.clockType === 'IN_OFFICE' ? 'Office HQ' : 'Unknown'),
-            department: s.user.department
+            department: (s as any).user.department
         }));
 
-    return {
+    const result = {
         totalActiveUsers,
         clockedIn: clockedInCount,
         remoteCount,
         officeCount,
         attendanceRate: Math.round(attendanceRate),
-        pendingApprovals: pendingLeaves + pendingUsers,
+        pendingApprovals: (pendingLeaves || 0) + (pendingUsers || 0),
+        teamName,
         alerts,
         recentActivity,
         remoteUsers,
         health: {
             server: 'online',
             db: 'connected',
-            apiLatency: Math.floor(Math.random() * 50) + 10 + 'ms', // Mock
+            apiLatency: Math.floor(Math.random() * 50) + 10 + 'ms',
             lastBackup: '2 hours ago'
         },
         compliance: {
             incompleteProfiles,
-            pendingPolicy: 0 // Mock for now
+            pendingPolicy: 0
         }
     };
-};
 
+    // Cache for 60 seconds
+    cache.set(cacheKey, result, 60);
+    return result;
+};

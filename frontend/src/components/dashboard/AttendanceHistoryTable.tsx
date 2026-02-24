@@ -42,7 +42,7 @@ export default function AttendanceHistoryTable({ token }: { token: string }) {
                 })
                 if (res.ok) {
                     const data = await res.json()
-                    setHistory(data)
+                    setHistory(Array.isArray(data) ? data : (data.history || []))
                 }
             } catch (err) {
                 console.error(err)

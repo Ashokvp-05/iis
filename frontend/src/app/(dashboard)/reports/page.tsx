@@ -51,7 +51,7 @@ export default function ReportsPage() {
                 })
                 if (res.ok) {
                     const data = await res.json()
-                    setEntries(data)
+                    setEntries(Array.isArray(data) ? data : (data.entries || []))
                     setCurrentPage(1)
                 }
             } catch (e) {

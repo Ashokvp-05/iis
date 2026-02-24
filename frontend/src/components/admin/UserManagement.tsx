@@ -299,15 +299,16 @@ export default function UserManagement({ token }: { token: string }) {
 
             if (usersRes.ok) {
                 const data = await usersRes.json()
-                setUsers(data.users)
-                setTotalPages(data.pagination.totalPages)
-                setTotalUsers(data.pagination.total)
+                setUsers(Array.isArray(data.users) ? data.users : [])
+                setTotalPages(data.pagination?.totalPages || 1)
+                setTotalUsers(data.pagination?.total || 0)
             } else {
                 toast({ title: "Access Denied", description: "You don't have permission to view the user registry.", variant: "destructive" })
             }
 
             if (rolesRes.ok) {
-                setRoles(await rolesRes.json())
+                const data = await rolesRes.json()
+                setRoles(Array.isArray(data) ? data : [])
             }
         } catch (err) {
             console.error("Failed to fetch initial data", err)

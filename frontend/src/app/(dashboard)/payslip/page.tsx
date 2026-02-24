@@ -44,16 +44,22 @@ export default function PayslipPage() {
     const [mounted, setMounted] = useState(false)
     const [showGenerateModal, setShowGenerateModal] = useState(false)
     const [selectedPayslip, setSelectedPayslip] = useState<any>(null)
-    const [genData, setGenData] = useState({ userId: "", month: "", year: new Date().getFullYear().toString(), amount: "" })
+    const [genData, setGenData] = useState({
+        userId: "",
+        month: format(new Date(), "MMMM"),
+        year: new Date().getFullYear().toString(),
+        amount: ""
+    })
     const [generating, setGenerating] = useState(false)
     const [requestingLegacy, setRequestingLegacy] = useState(false)
     const [releasing, setReleasing] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
 
     const role = (session?.user?.role || "USER").toUpperCase()
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role)
-    const isManager = role === 'MANAGER'
-    const canManage = isAdmin || isManager
+    // EXTREME PRIVACY: Only HR and Super Admin can manage/view others' payslips
+    const canManage = ['HR', 'HR_ADMIN', 'SUPER_ADMIN'].includes(role)
+    const canIssue = ['HR', 'HR_ADMIN', 'SUPER_ADMIN'].includes(role)
+    const isHR = ['HR', 'HR_ADMIN'].includes(role)
 
     useEffect(() => {
         setMounted(true)
@@ -66,13 +72,17 @@ export default function PayslipPage() {
                 const res = await fetch(`${API_BASE_URL}/payroll/my-payslips`, {
                     headers: { Authorization: `Bearer ${token}` }
                 })
-                if (res.ok) setPayslips(await res.json())
-                else {
-                    // Fallback to old endpoint if new one isn't 100% yet
+                if (res.ok) {
+                    const data = await res.json()
+                    setPayslips(Array.isArray(data) ? data : (data.payslips || []))
+                } else {
                     const oldRes = await fetch(`${API_BASE_URL}/payslips/my`, {
                         headers: { Authorization: `Bearer ${token}` }
                     })
-                    if (oldRes.ok) setPayslips(await oldRes.json())
+                    if (oldRes.ok) {
+                        const data = await oldRes.json()
+                        setPayslips(Array.isArray(data) ? data : (data.payslips || []))
+                    }
                 }
 
                 // Management Queue fetch (Admins + Managers)
@@ -80,15 +90,21 @@ export default function PayslipPage() {
                     const queueRes = await fetch(`${API_BASE_URL}/payslips/all?status=GENERATED`, {
                         headers: { Authorization: `Bearer ${token}` }
                     })
-                    if (queueRes.ok) setPendingRelease(await queueRes.json())
+                    if (queueRes.ok) {
+                        const data = await queueRes.json()
+                        setPendingRelease(Array.isArray(data) ? data : (data.payslips || []))
+                    }
                 }
 
-                // Global Users fetch (Admins only for generation)
-                if (isAdmin) {
-                    const usersRes = await fetch(`${API_BASE_URL}/users`, {
+                // Global Users fetch (High limit for dropdown)
+                if (canIssue) {
+                    const usersRes = await fetch(`${API_BASE_URL}/users?limit=ALL`, {
                         headers: { Authorization: `Bearer ${token}` }
                     })
-                    if (usersRes.ok) setAllUsers(await usersRes.json())
+                    if (usersRes.ok) {
+                        const data = await usersRes.json()
+                        setAllUsers(Array.isArray(data) ? data : (data.users || []))
+                    }
                 }
             } catch (e) {
                 console.error(e)
@@ -98,7 +114,7 @@ export default function PayslipPage() {
             }
         }
         if (session) init()
-    }, [session, isAdmin, canManage])
+    }, [session, canIssue, canManage])
 
     const handleDownload = async (id: string, filename: string) => {
         const token = (session?.user as any)?.accessToken
@@ -174,6 +190,11 @@ export default function PayslipPage() {
     }
 
     const handleGenerate = async () => {
+        if (!genData.userId || !genData.month || !genData.amount) {
+            toast.error("Security Protocol Alert: Missing identity or financial data")
+            return
+        }
+
         const token = (session?.user as any)?.accessToken
         setGenerating(true)
         try {
@@ -184,7 +205,8 @@ export default function PayslipPage() {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    ...genData,
+                    userId: genData.userId,
+                    month: genData.month,
                     year: parseInt(genData.year),
                     amount: parseFloat(genData.amount)
                 })
@@ -193,9 +215,11 @@ export default function PayslipPage() {
                 const newSlip = await res.json()
                 setPendingRelease(prev => [newSlip, ...prev])
                 toast.success("Payslip synthesized successfully")
+                setGenData(prev => ({ ...prev, userId: "", amount: "" })) // Reset selection
                 setShowGenerateModal(false)
             } else {
-                toast.error("Generation failed")
+                const err = await res.json()
+                toast.error(err.error || "Generation failed - Engine rejection")
             }
         } catch (e) {
             toast.error("Internal Engine Fault")
@@ -225,10 +249,10 @@ export default function PayslipPage() {
                     <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Payslips</h1>
                     <p className="text-sm font-semibold text-slate-500 mt-1 uppercase tracking-[0.2em] flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                        {canManage ? (isAdmin ? "Executive Administrative Console" : "Management Oversight Portal") : "Secure Document Vault"}
+                        {canManage ? (isHR ? "Human Resources Financial Command" : "Executive Administrative Console") : "Secure Document Vault"}
                     </p>
                 </div>
-                {isAdmin && (
+                {canIssue && (
                     <Button
                         onClick={() => setShowGenerateModal(true)}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-6 h-12 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-600/20"
@@ -415,23 +439,35 @@ export default function PayslipPage() {
                     <div className="space-y-6 pt-6">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target User</Label>
-                            <Select onValueChange={(v) => setGenData({ ...genData, userId: v })}>
-                                <SelectTrigger className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold">
+                            <Select
+                                value={genData.userId}
+                                onValueChange={(v) => setGenData(prev => ({ ...prev, userId: v }))}
+                            >
+                                <SelectTrigger className="h-12 w-full rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold relative z-10 cursor-pointer pointer-events-auto">
                                     <SelectValue placeholder="Choose Employee..." />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl border-slate-100 dark:border-white/5">
-                                    {allUsers.map(u => (
-                                        <SelectItem key={u.id} value={u.id} className="font-bold text-xs">{u.name}</SelectItem>
-                                    ))}
+                                    {allUsers.length > 0 ? (
+                                        allUsers.map(u => (
+                                            <SelectItem key={u.id} value={u.id} className="font-bold text-xs ring-0">
+                                                {u.name} ({u.department || 'Staff'})
+                                            </SelectItem>
+                                        ))
+                                    ) : (
+                                        <div className="p-4 text-center text-[10px] font-black uppercase text-slate-400">Loading Personnel...</div>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</Label>
-                                <Select onValueChange={(v) => setGenData({ ...genData, month: v })}>
-                                    <SelectTrigger className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold">
-                                        <SelectValue placeholder="Month" />
+                                <Select
+                                    value={genData.month}
+                                    onValueChange={(v) => setGenData(prev => ({ ...prev, month: v }))}
+                                >
+                                    <SelectTrigger className="h-12 w-full rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold relative z-10 cursor-pointer pointer-events-auto">
+                                        <SelectValue placeholder="Select Month" />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-2xl border-slate-100 dark:border-white/5">
                                         {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
@@ -442,12 +478,29 @@ export default function PayslipPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Year</Label>
-                                <Input type="number" value={genData.year} onChange={(e) => setGenData({ ...genData, year: e.target.value })} className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold" />
+                                <Input
+                                    type="text"
+                                    value={genData.year}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setGenData(prev => ({ ...prev, year: val }));
+                                    }}
+                                    className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold"
+                                />
                             </div>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Salary Amount ($)</Label>
-                            <Input type="number" placeholder="0.00" onChange={(e) => setGenData({ ...genData, amount: e.target.value })} className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold" />
+                            <Input
+                                type="text"
+                                placeholder="0.00"
+                                value={genData.amount}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setGenData(prev => ({ ...prev, amount: val }));
+                                }}
+                                className="h-12 rounded-2xl border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 font-bold"
+                            />
                         </div>
                     </div>
                     <DialogFooter className="pt-10">

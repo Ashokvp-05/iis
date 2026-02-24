@@ -66,6 +66,7 @@ export const getAllRequests = async (req: Request, res: Response) => {
     try {
         const loggedInUser = (req as AuthRequest).user;
         let targetDepartment: string | undefined = undefined;
+        let targetManagerId: string | undefined = undefined;
 
         if (loggedInUser?.roleId) {
             const user = await prisma.user.findUnique({
@@ -73,13 +74,11 @@ export const getAllRequests = async (req: Request, res: Response) => {
                 include: { role: true }
             });
             if (user?.role?.name === 'MANAGER') {
-                targetDepartment = user.department || undefined;
-                // If manager has no dept, they see nothing or all? Usually nothing or just themselves.
-                // Let's assume strict department filtering.
+                targetManagerId = user.id;
             }
         }
 
-        const requests = await leaveService.getAllRequests(targetDepartment);
+        const requests = await leaveService.getAllRequests(targetDepartment, targetManagerId);
         res.json(requests);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

@@ -39,7 +39,7 @@ export default function TimesheetTable({ token }: { token: string }) {
             })
             if (!res.ok) throw new Error("Failed to fetch history")
             const data = await res.json()
-            setEntries(data)
+            setEntries(Array.isArray(data) ? data : (data.entries || []))
         } catch (err) {
             setError("Failed to load history")
         } finally {

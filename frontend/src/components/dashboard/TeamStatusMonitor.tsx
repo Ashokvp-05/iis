@@ -55,12 +55,14 @@ export function TeamStatusMonitor({ remoteUsers }: { remoteUsers: TeamMemberStat
                             )}
                             <div className="absolute inset-0 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl animate-[spin_10s_linear_infinite]" />
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             <p className="text-slate-900 dark:text-white text-base font-black uppercase tracking-[0.2em]">
-                                {searchQuery ? "No Matches detected" : "Static Signal"}
+                                {searchQuery ? "No Matches detected" : "Operational Silence"}
                             </p>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-loose max-w-[200px] mx-auto opacity-60">
-                                {searchQuery ? "Try refining your search parameters" : "No active session broadcasts detected in the sector"}
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-loose max-w-[280px] mx-auto opacity-70">
+                                {searchQuery
+                                    ? "Try refining your search parameters to locate specific nodes."
+                                    : "No active team sessions detected. Once your team members clock in, their live telemetry will appear here."}
                             </p>
                         </div>
                     </div>

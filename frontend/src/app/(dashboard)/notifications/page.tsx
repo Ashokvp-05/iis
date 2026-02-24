@@ -37,7 +37,7 @@ export default function NotificationsPage() {
                 })
                 if (res.ok) {
                     const data = await res.json()
-                    setNotifications(data)
+                    setNotifications(Array.isArray(data) ? data : (data.notifications || []))
                 }
             } catch (error) {
                 console.error("Failed to fetch notifications")

@@ -53,9 +53,13 @@ export const getUserRequests = async (userId: string) => {
     });
 };
 
-export const getAllRequests = async (departmentId?: string) => {
+export const getAllRequests = async (departmentId?: string, managerId?: string) => {
+    const where: any = {};
+    if (departmentId) where.user = { department: departmentId };
+    if (managerId) where.user = { managerId: managerId };
+
     return prisma.leaveRequest.findMany({
-        where: departmentId ? { user: { department: departmentId } } : undefined,
+        where,
         include: { user: { select: { name: true, email: true, department: true } } },
         orderBy: { createdAt: 'desc' }
     });

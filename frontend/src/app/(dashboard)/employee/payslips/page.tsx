@@ -27,7 +27,7 @@ export default function EmployeePayslipsPage() {
                 })
                 if (res.ok) {
                     const data = await res.json()
-                    setPayslips(data)
+                    setPayslips(Array.isArray(data) ? data : (data.payslips || []))
                 }
             } catch (error) {
                 console.error("Failed to fetch payslips", error)

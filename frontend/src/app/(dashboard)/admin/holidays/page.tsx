@@ -31,7 +31,7 @@ export default function HolidaysPage() {
             })
             if (res.ok) {
                 const data = await res.json()
-                setHolidays(data)
+                setHolidays(Array.isArray(data) ? data : (data.holidays || []))
             }
         } catch (error) {
             console.error("Failed to fetch holidays")

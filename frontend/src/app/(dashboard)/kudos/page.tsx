@@ -21,8 +21,14 @@ export default async function KudosPage() {
             fetch(`${API_BASE_URL}/users`, { headers: { Authorization: `Bearer ${token}` } })
         ])
 
-        if (kudosRes.ok) kudosList = await kudosRes.json()
-        if (usersRes.ok) users = await usersRes.json()
+        if (kudosRes.ok) {
+            const data = await kudosRes.json()
+            kudosList = Array.isArray(data) ? data : (data.kudos || [])
+        }
+        if (usersRes.ok) {
+            const data = await usersRes.json()
+            users = Array.isArray(data) ? data : (data.users || [])
+        }
     } catch (e) {
         console.error("Failed to fetch kudos data")
     }

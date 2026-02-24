@@ -70,12 +70,18 @@ export default async function AdminDashboardPage() {
         ])
 
         if (overviewRes.ok) overview = await overviewRes.json()
-        if (pendingUsersRes.ok) pendingUsers = await pendingUsersRes.json()
-        if (leavesRes.ok) {
-            const allLeaves = await leavesRes.json() as PendingLeave[]
-            pendingLeaves = allLeaves.filter(l => l.status === 'PENDING')
+        if (pendingUsersRes.ok) {
+            const users = await pendingUsersRes.json()
+            pendingUsers = Array.isArray(users) ? users : (users.users || [])
         }
-        if (payslipsRes.ok) pendingPayslips = await payslipsRes.json() as PendingPayslip[]
+        if (leavesRes.ok) {
+            const allLeaves = await leavesRes.json()
+            pendingLeaves = Array.isArray(allLeaves) ? allLeaves.filter((l: any) => l.status === 'PENDING') : []
+        }
+        if (payslipsRes.ok) {
+            const slips = await payslipsRes.json()
+            pendingPayslips = Array.isArray(slips) ? slips : (slips.payslips || [])
+        }
     } catch (e) {
         console.error("Failed to fetch admin dashboard data", e)
     }

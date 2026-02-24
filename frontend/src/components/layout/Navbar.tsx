@@ -90,9 +90,19 @@ export default function Navbar({ role }: { role?: string }) {
     const getSecondaryItems = () => {
         const normalizedRole = role?.toUpperCase()
         if (!normalizedRole) return []
-        if (['ADMIN', 'SUPER_ADMIN'].includes(normalizedRole)) return adminItems
-        if (normalizedRole === 'MANAGER') return managerItems
+
+        // Super Admin sees everything
+        if (normalizedRole === 'SUPER_ADMIN') return adminItems
+
+        // General Admin sees a restricted subset (No Payroll)
+        if (normalizedRole === 'ADMIN') return adminItems.filter(item => !item.href.toLowerCase().includes('payroll'))
+
+        // HR sees their specific portal + payroll
         if (normalizedRole === 'HR' || normalizedRole === 'HR_ADMIN') return hrItems
+
+        // Manager sees their team dashboard items
+        if (normalizedRole === 'MANAGER') return managerItems
+
         return []
     }
 

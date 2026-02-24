@@ -47,7 +47,7 @@ export default function EmployeeTable({ token }: { token: string }) {
             })
             if (res.ok) {
                 const data = await res.json()
-                setUsers(data)
+                setUsers(Array.isArray(data) ? data : (data.users || []))
             }
         } catch (err) {
             console.error("Failed to fetch users", err)

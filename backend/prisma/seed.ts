@@ -1,6 +1,8 @@
 import { PrismaClient, UserStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+declare const process: any;
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -23,6 +25,15 @@ async function main() {
         create: {
             name: 'EMPLOYEE',
             permissions: { read: true },
+        },
+    });
+
+    const managerRole = await prisma.role.upsert({
+        where: { name: 'MANAGER' },
+        update: {},
+        create: {
+            name: 'MANAGER',
+            permissions: { read: true, write: false, manage_team: true },
         },
     });
 
@@ -61,36 +72,101 @@ async function main() {
         },
     });
 
-    // Create Manager Role and User
-    const managerPassword = await bcrypt.hash('Manager@123', 10);
+    // --- CREATE MANAGERIAL TEAMS ---
+    console.log('Seeding Managerial Teams...');
 
-    const managerRole = await prisma.role.upsert({
-        where: { name: 'MANAGER' },
+    const managerCategories = [
+        { name: 'Dev Lead', dept: 'Software Developer', email: 'dev_lead@hrms.com' },
+        { name: 'Sales Head', dept: 'Sales Executive', email: 'sales_head@hrms.com' },
+        { name: 'Design Lead', dept: 'Designer', email: 'design_lead@hrms.com' },
+        { name: 'Analyst Lead', dept: 'Analyst', email: 'analyst_lead@hrms.com' },
+        { name: 'Support lead', dept: 'Support Executive', email: 'support_lead@hrms.com' },
+        { name: 'Marketing Lead', dept: 'Marketing', email: 'marketing_lead@hrms.com' },
+        { name: 'Product Lead', dept: 'Product', email: 'product_lead@hrms.com' }
+    ];
+
+    const managersMap: Record<string, string> = {};
+
+    for (const cat of managerCategories) {
+        const password = await bcrypt.hash(`${cat.dept.replace(' ', '')}@123`, 10);
+        const m = await prisma.user.upsert({
+            where: { email: cat.email },
+            update: { roleId: managerRole.id },
+            create: {
+                email: cat.email,
+                name: cat.name,
+                password,
+                roleId: managerRole.id,
+                status: UserStatus.ACTIVE,
+                department: cat.dept,
+                designation: 'Team Manager'
+            }
+        });
+        managersMap[cat.dept] = m.id;
+    }
+
+    // --- CREATE TEAM-SPECIFIC EMPLOYEES ---
+    console.log('Seeding Team Employees...');
+    const departments = Object.keys(managersMap);
+
+    for (const dept of departments) {
+        const mgrId = managersMap[dept];
+        let count = 3;
+        if (dept === 'Software Developer') count = 10;
+        else if (dept === 'Marketing' || dept === 'Product') count = 5;
+
+        for (let i = 1; i <= count; i++) {
+            const email = `${dept.toLowerCase().replace(' ', '_')}_emp${i}@hrms.com`;
+            const name = `${dept} Specialist ${i}`;
+            const pwd = await bcrypt.hash('Employee@123', 10);
+
+            await (prisma.user as any).upsert({
+                where: { email },
+                update: { managerId: mgrId },
+                create: {
+                    email,
+                    name,
+                    password: pwd,
+                    roleId: employeeRole.id,
+                    managerId: mgrId,
+                    status: UserStatus.ACTIVE,
+                    department: dept,
+                    designation: dept.includes('Lead') ? 'Senior' : 'Specialist'
+                }
+            });
+        }
+    }
+
+    // Create HR Role and User
+    const hrPassword = await bcrypt.hash('HR@123', 10);
+
+    const hrRole = await prisma.role.upsert({
+        where: { name: 'HR' },
         update: {},
         create: {
-            name: 'MANAGER',
-            permissions: { read: true, write: false, manage_team: false },
+            name: 'HR',
+            permissions: { read: true, write: true, manage_payroll: true },
         },
     });
 
-    const manager = await prisma.user.upsert({
-        where: { email: 'manager@hrms.com' },
+    const hr = await prisma.user.upsert({
+        where: { email: 'hr@hrms.com' },
         update: {
-            password: managerPassword,
-            roleId: managerRole.id
+            password: hrPassword,
+            roleId: hrRole.id
         },
         create: {
-            email: 'manager@hrms.com',
-            name: 'Sarah Manager',
-            password: managerPassword,
-            roleId: managerRole.id,
+            email: 'hr@hrms.com',
+            name: 'Hannah HR',
+            password: hrPassword,
+            roleId: hrRole.id,
             status: UserStatus.ACTIVE,
-            department: 'Sales',
-            designation: 'Sales Director'
+            department: 'Human Resources',
+            designation: 'HR Lead'
         },
     });
 
-    console.log({ admin, employee, manager });
+    console.log({ admin, employee, hr });
 
     // --- CREATE SALARY CONFIGS (For Payroll Engine) ---
     console.log('Seeding salary configurations...');
@@ -104,16 +180,6 @@ async function main() {
             pf: 5000,
             tax: 8000,
             otherAllowances: 2000
-        },
-        {
-            userId: manager.id,
-            basicSalary: 55000,
-            hra: 20000,
-            da: 8000,
-            bonus: 4000,
-            pf: 4500,
-            tax: 6000,
-            otherAllowances: 1500
         },
         {
             userId: employee.id,
@@ -187,17 +253,7 @@ async function main() {
         }
     });
 
-    await prisma.leaveRequest.create({
-        data: {
-            userId: manager.id,
-            type: 'CASUAL',
-            startDate: new Date(now.getTime() - 86400000 * 10),
-            endDate: new Date(now.getTime() - 86400000 * 8),
-            reason: 'Family event',
-            status: 'APPROVED',
-            approvedBy: admin.id
-        }
-    });
+    // Manager leave ignored for now
 
     // --- ACTIVE SESSION (For Dashboard Workload) ---
     console.log('Seeding active session...');
@@ -219,7 +275,6 @@ async function main() {
             data: [
                 { action: 'LOGIN', adminId: admin.id, targetId: admin.id, details: 'Admin system login' },
                 { action: 'USER_ROLE_UPDATE', adminId: admin.id, targetId: employee.id, details: 'Updated employee permissions' },
-                { action: 'LEAVE_APPROVE', adminId: admin.id, targetId: manager.id, details: 'Approved casual leave for Sarah' },
                 { action: 'SETTINGS_UPDATE', adminId: admin.id, targetId: admin.id, details: 'Updated system clock-out rules' }
             ]
         });

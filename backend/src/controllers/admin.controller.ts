@@ -57,11 +57,19 @@ export const getStats = async (req: Request, res: Response) => {
 
 export const getOverview = async (req: Request, res: Response) => {
     try {
-        const cached = cache.get("admin_overview");
+        const user = (req as any).user;
+        const role = (user?.role || "").toUpperCase();
+
+        // Filter by managerId if the user is a manager (and not an admin)
+        const isManager = role === 'MANAGER';
+        const managerId = isManager ? user.id : undefined;
+
+        const cacheKey = managerId ? `admin_overview_${managerId}` : "admin_overview";
+        const cached = cache.get(cacheKey);
         if (cached) return res.json(cached);
 
-        const overview = await adminService.getDashboardOverview();
-        cache.set("admin_overview", overview, 60); // Cache for 1 min
+        const overview = await adminService.getDashboardOverview(managerId);
+        cache.set(cacheKey, overview, 60); // Cache for 1 min
         res.json(overview);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
+import { API_BASE_URL } from "@/lib/config"
 
 interface Announcement {
     id: string
@@ -71,12 +72,12 @@ export default function AnnouncementsPage() {
 
     const fetchAnnouncements = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/announcements`, {
+            const res = await fetch(`${API_BASE_URL}/announcements`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) {
                 const data = await res.json()
-                setAnnouncements(data)
+                setAnnouncements(Array.isArray(data) ? data : (data.announcements || []))
             }
         } catch (error) {
             console.error("Failed to fetch announcements", error)
@@ -92,7 +93,7 @@ export default function AnnouncementsPage() {
         }
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/announcements`, {
+            const res = await fetch(`${API_BASE_URL}/announcements`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -116,7 +117,7 @@ export default function AnnouncementsPage() {
 
     const handleDelete = async (id: string) => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/announcements/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` }
             })

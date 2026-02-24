@@ -46,6 +46,9 @@ model User {
   tickets          Ticket[]        @relation("CreatedTickets")
   timeEntries      TimeEntry[]
   tags             UserTag[]
+  managerId        String?         @map("manager_id")
+  manager          User?           @relation("ReportingChain", fields: [managerId], references: [id])
+  reports          User[]          @relation("ReportingChain")
   role             Role?           @relation(fields: [roleId], references: [id])
   wellnessChecks   WellnessCheck[]
 
@@ -112,6 +115,7 @@ model TimeEntry {
   user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
+  @@index([status, clockOut])
   @@index([clockIn])
   @@map("time_entries")
 }
@@ -131,6 +135,7 @@ model LeaveRequest {
   user            User        @relation(fields: [userId], references: [id])
 
   @@index([userId, status])
+  @@index([status])
   @@index([createdAt])
   @@map("leave_requests")
 }

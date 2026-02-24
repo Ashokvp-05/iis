@@ -30,10 +30,10 @@ interface Ticket {
     };
 }
 
-export function AdminTicketBoard({ token }: { token: string }) {
+export function AdminTicketBoard({ token, initialTickets = [] }: { token: string, initialTickets?: Ticket[] }) {
     const { toast } = useToast()
-    const [tickets, setTickets] = useState<Ticket[]>([])
-    const [loading, setLoading] = useState(true)
+    const [tickets, setTickets] = useState<Ticket[]>(initialTickets)
+    const [loading, setLoading] = useState(initialTickets.length === 0)
     const [filter, setFilter] = useState("ALL")
     const [statusUpdating, setStatusUpdating] = useState<string | null>(null)
 

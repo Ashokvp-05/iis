@@ -21,7 +21,17 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { TeamAnnouncer } from "@/components/dashboard/TeamAnnouncer"
 import { TeamStatusMonitor } from "@/components/dashboard/TeamStatusMonitor"
-import { ManagerOverview } from "@/types/manager"
+export interface ManagerOverview {
+    totalActiveUsers: number;
+    clockedIn: number;
+    remoteCount: number;
+    officeCount: number;
+    attendanceRate: number;
+    pendingApprovals: number;
+    teamName?: string;
+    alerts: any[];
+    remoteUsers: any[];
+}
 
 export default async function ManagerDashboardPage() {
     const session = await auth()
@@ -41,6 +51,7 @@ export default async function ManagerDashboardPage() {
         officeCount: 0,
         attendanceRate: 0,
         pendingApprovals: 0,
+        teamName: "Departmental Unit",
         alerts: [],
         remoteUsers: []
     }
@@ -48,20 +59,27 @@ export default async function ManagerDashboardPage() {
     try {
         const res = await fetch(`${API_BASE_URL}/admin/overview`, {
             headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store'
+            next: { revalidate: 0 }
         })
-        if (res.ok) overview = await res.json()
-    } catch {
-        console.error("Telemetry failure. Overview data unavailable.")
+        if (res.ok) {
+            const data = await res.json()
+            overview = {
+                ...overview,
+                ...data,
+                remoteUsers: Array.isArray(data.remoteUsers) ? data.remoteUsers : []
+            }
+        }
+    } catch (error) {
+        console.error("Telemetry failure. Overview data unavailable.", error)
     }
 
     const today = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
     const statsCards = [
-        { label: "Active Nodes", value: overview.clockedIn, icon: Radio, trend: "Stable", color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "Remote Signal", value: overview.remoteCount, icon: MapPin, trend: "Encrypted", color: "text-amber-500", bg: "bg-amber-500/10" },
-        { label: "Alert Queue", value: overview.pendingApprovals, icon: AlertCircle, trend: "Urgent", color: "text-rose-500", bg: "bg-rose-500/10" },
-        { label: "Efficiency", value: `${overview.attendanceRate}%`, icon: Zap, trend: "Nominal", color: "text-indigo-500", bg: "bg-indigo-500/10" }
+        { label: "Active Nodes", value: overview.clockedIn || 0, icon: Radio, trend: "Stable", color: "text-emerald-500", bg: "bg-emerald-500/10" },
+        { label: "Remote Signal", value: overview.remoteCount || 0, icon: MapPin, trend: "Encrypted", color: "text-amber-500", bg: "bg-amber-500/10" },
+        { label: "Alert Queue", value: overview.pendingApprovals || 0, icon: AlertCircle, trend: "Urgent", color: "text-rose-500", bg: "bg-rose-500/10" },
+        { label: "Efficiency", value: `${overview.attendanceRate || 0}%`, icon: Zap, trend: "Nominal", color: "text-indigo-500", bg: "bg-indigo-500/10" }
     ]
 
     return (
@@ -78,7 +96,9 @@ export default async function ManagerDashboardPage() {
                         <div className="space-y-4">
                             <div className="flex items-center gap-3">
                                 <span className="h-1.5 w-8 bg-indigo-500 rounded-full animate-pulse" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Tactical Command Center</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">
+                                    {overview.teamName || "Tactical Command Center"}
+                                </span>
                             </div>
                             <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-white uppercase leading-none">
                                 Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-indigo-600 animate-gradient-x">{session.user.name?.split(' ')[0]}</span>
@@ -244,7 +264,12 @@ export default async function ManagerDashboardPage() {
                         <Card className="border-0 shadow-3xl bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden">
                             <CardHeader className="p-8 border-b border-slate-50 dark:border-white/5">
                                 <div className="space-y-1">
-                                    <CardTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Authorization <span className="text-rose-600">Queue</span></CardTitle>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Authorization <span className="text-rose-600">Queue</span></CardTitle>
+                                        <Badge variant="outline" className="h-5 px-2 text-[10px] font-black border-rose-500/20 text-rose-500">
+                                            {overview.pendingApprovals} PENDING
+                                        </Badge>
+                                    </div>
                                     <CardDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500">Resource requests requiring immediate validation</CardDescription>
                                 </div>
                             </CardHeader>
@@ -254,23 +279,24 @@ export default async function ManagerDashboardPage() {
                         </Card>
 
                         {/* QUICK ACCESS HUD */}
-                        <Card className="border-0 shadow-3xl bg-slate-900 dark:bg-black rounded-[2.5rem] p-8 text-white">
+                        <Card className="border-0 shadow-3xl bg-slate-900 dark:bg-black rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
+                            <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-600/10 rounded-full blur-3xl group-hover:bg-indigo-600/20 transition-all duration-700" />
                             <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-8 flex items-center gap-3">
                                 <Target className="w-4 h-4" /> Command Hub
                             </h4>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 relative z-10">
                                 {[
-                                    { label: "Onboard Talent", icon: UserPlus, href: "/manager/team", color: "text-emerald-400", bg: "bg-emerald-400/10" },
-                                    { label: "Draft Offer", icon: FilePlus, href: "/manager/team", color: "text-amber-400", bg: "bg-amber-400/10" },
-                                    { label: "Task Board", icon: ClipboardList, href: "#", color: "text-indigo-400", bg: "bg-indigo-400/10" },
-                                    { label: "Audit Reports", icon: Download, href: "/manager/reports", color: "text-fuchsia-400", bg: "bg-fuchsia-400/10" }
+                                    { label: "Team Database", icon: Users, href: "/admin/users", color: "text-emerald-400", bg: "bg-emerald-400/10" },
+                                    { label: "Approval Log", icon: ClipboardList, href: "/admin/leaves", color: "text-amber-400", bg: "bg-amber-400/10" },
+                                    { label: "Global Sync", icon: Radio, href: "/admin/announcements", color: "text-indigo-400", bg: "bg-indigo-400/10" },
+                                    { label: "Fleet Reports", icon: Download, href: "/manager/reports", color: "text-fuchsia-400", bg: "bg-fuchsia-400/10" }
                                 ].map((item, i) => (
                                     <Link key={i} href={item.href}>
-                                        <div className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group flex flex-col gap-3">
-                                            <div className={`p-3 rounded-xl ${item.bg} ${item.color} self-start group-hover:scale-110 transition-transform`}>
+                                        <div className="p-4 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group flex flex-col gap-4">
+                                            <div className={`p-3 rounded-2xl ${item.bg} ${item.color} self-start group-hover:scale-110 transition-transform shadow-lg`}>
                                                 <item.icon className="w-5 h-5" />
                                             </div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors leading-tight">{item.label}</p>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-indigo-400 transition-colors leading-tight">{item.label}</p>
                                         </div>
                                     </Link>
                                 ))}

@@ -33,7 +33,7 @@ export function UserManagementTable({ token }: { token: string }) {
             })
             if (res.ok) {
                 const data = await res.json()
-                setUsers(data)
+                setUsers(Array.isArray(data) ? data : (data.users || []))
             }
         } catch (e) {
             console.error(e)

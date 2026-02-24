@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,8 +25,38 @@ import { Loader2, UploadCloud, Users, Calendar, DollarSign, FileText, Zap, Searc
 import { API_BASE_URL } from "@/lib/config"
 import { cn } from "@/lib/utils"
 
+import { redirect } from "next/navigation"
+
 export default function PayrollPage() {
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
+    const router = useRouter()
+
+    useEffect(() => {
+        if (status === "loading") return
+        if (!session) {
+            router.push("/login")
+            return
+        }
+        const role = (session.user as any).role?.toUpperCase() || "USER"
+        const isAuthorized = ['SUPER_ADMIN', 'HR_ADMIN', 'HR'].includes(role)
+        if (!isAuthorized) {
+            router.push("/dashboard")
+        }
+    }, [session, status, router])
+
+    if (status === "loading") return (
+        <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        </div>
+    )
+
+    if (!session) return null
+
+    const role = (session.user?.role || "USER").toUpperCase()
+    const isAuthorized = ['SUPER_ADMIN', 'HR_ADMIN', 'HR'].includes(role)
+    const canGenerate = isAuthorized // In this strict mode, entrance implies generation rights
+
+    if (!isAuthorized) return null
 
     // Data state
     const [users, setUsers] = useState<any[]>([])
@@ -74,21 +105,21 @@ export default function PayrollPage() {
             fetch(`${API_BASE_URL}/users`, {
                 headers: { Authorization: `Bearer ${token}` }
             }).then(res => {
-                if (res.ok) res.json().then(data => setUsers(data))
+                if (res.ok) res.json().then(data => setUsers(Array.isArray(data) ? data : (data.users || [])))
             })
 
             // Fetch All Payslips
             fetch(`${API_BASE_URL}/payslips/all`, {
                 headers: { Authorization: `Bearer ${token}` }
             }).then(res => {
-                if (res.ok) res.json().then(data => setPayslips(data))
+                if (res.ok) res.json().then(data => setPayslips(Array.isArray(data) ? data : (data.payslips || [])))
             })
 
             // Fetch Batches
             fetch(`${API_BASE_URL}/payroll/batches`, {
                 headers: { Authorization: `Bearer ${token}` }
             }).then(res => {
-                if (res.ok) res.json().then(data => setBatches(data))
+                if (res.ok) res.json().then(data => setBatches(Array.isArray(data) ? data : (data.batches || [])))
             })
 
         } catch (error) {
@@ -359,12 +390,14 @@ export default function PayrollPage() {
                             <h3 className="text-xl font-black text-slate-900 dark:text-white">Active Payroll Cycles</h3>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Manage monthly disbursement cycles</p>
                         </div>
-                        <Button
-                            onClick={() => setShowCreateBatchModal(true)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-6 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20"
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Initialize Batch
-                        </Button>
+                        {canGenerate && (
+                            <Button
+                                onClick={() => setShowCreateBatchModal(true)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-6 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20"
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Initialize Batch
+                            </Button>
+                        )}
                     </div>
 
                     <div className="grid gap-6">
@@ -396,7 +429,7 @@ export default function PayrollPage() {
 
                                         <div className="flex items-center gap-3">
                                             {/* Action Buttons based on Status */}
-                                            {batch.status === 'DRAFT' && (
+                                            {batch.status === 'DRAFT' && canGenerate && (
                                                 <Button
                                                     onClick={() => handleBatchAction(batch.id, 'generate')}
                                                     disabled={processingBatch === batch.id}

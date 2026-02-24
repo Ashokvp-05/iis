@@ -1,13 +1,22 @@
 import prisma from '../config/db';
 
-export const getAllUsers = async (query: { page?: number; limit?: number; search?: string; status?: string }) => {
+export const getAllUsers = async (query: { page?: number; limit?: number; search?: string; status?: string; managerId?: string }) => {
     const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
-    const skip = (page - 1) * limit;
+    let limit = Number(query.limit) || 10;
+    let skip = (page - 1) * limit;
+
+    // Special case for 'ALL'
+    if (String(query.limit) === 'ALL') {
+        limit = 10000; // Arbitrary high number
+        skip = 0;
+    }
 
     const where: any = {};
     if (query.status && query.status !== 'ALL') {
         where.status = query.status;
+    }
+    if (query.managerId) {
+        where.managerId = query.managerId;
     }
     if (query.search) {
         where.OR = [

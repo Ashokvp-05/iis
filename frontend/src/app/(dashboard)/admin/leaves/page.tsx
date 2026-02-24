@@ -26,7 +26,8 @@ export default async function AdminLeavesPage() {
         })
         if (res.ok) {
             const all = await res.json()
-            leaves = all.filter((l: any) => l.status === 'PENDING')
+            const dataArray = Array.isArray(all) ? all : (all.leaves || [])
+            leaves = dataArray.filter((l: any) => l.status === 'PENDING')
         }
     } catch (e) {
         console.error("Failed to fetch leaves")

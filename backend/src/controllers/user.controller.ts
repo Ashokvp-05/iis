@@ -1,14 +1,29 @@
 import { Request, Response } from 'express';
 import * as userService from '../services/user.service';
+import prisma from '../config/db';
 
 export const getUsers = async (req: Request, res: Response) => {
     try {
         const { page, limit, search, status } = req.query;
+        const loggedInUser = (req as any).user;
+        let managerId: string | undefined = undefined;
+
+        if (loggedInUser) {
+            const user = await prisma.user.findUnique({
+                where: { id: loggedInUser.id },
+                include: { role: true }
+            });
+            if (user?.role?.name === 'MANAGER') {
+                managerId = user.id;
+            }
+        }
+
         const result = await userService.getAllUsers({
             page: page ? parseInt(page as string) : undefined,
-            limit: limit ? parseInt(limit as string) : undefined,
+            limit: limit === 'ALL' ? 'ALL' : (limit ? parseInt(limit as string) : undefined) as any,
             search: search as string,
-            status: status as string
+            status: status as string,
+            managerId
         });
         res.json(result);
     } catch (error: any) {
